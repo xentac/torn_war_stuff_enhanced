@@ -50,3 +50,27 @@
 .members-list .traveling.status::after {
   color: var(--user-status-blue-color);
 }
+
+.twse-sort-toggle-container {
+  position: absolute;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.twse-sort-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #999;
+  font-size: 13px;
+  user-select: none;
+}
+
+.twse-sort-toggle-checkbox {
+  cursor: pointer;
+  margin: 0;
+  width: 13px;
+  height: 13px;
+}

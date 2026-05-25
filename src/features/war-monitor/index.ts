@@ -561,37 +561,106 @@ const WarMonitorFeature: Feature = {
       }
     }
 
-    const initWarMonitoring = (factionWarList: Element) => {
-      log.info("Faction war list detected. Starting observation.");
-      if (factionWarList.querySelector(".faction-war")) {
+    const initWarMonitoring = (descriptions: Element) => {
+      log.info("Descriptions container detected. Starting observation.");
+
+      let injectedToggle = false;
+
+      const injectSortingToggle = (descEl: Element) => {
+        if (injectedToggle) return;
+        if (descEl.querySelector("#twse-war-sort-checkbox")) {
+          injectedToggle = true;
+          return;
+        }
+
+        const graphContainer = descEl.querySelector('[class*="graphIcon"]');
+        if (!graphContainer || !graphContainer.parentNode) return;
+
+        const parent = graphContainer.parentNode as HTMLElement;
+        parent.style.position = "relative";
+
+        const computedStyle = window.getComputedStyle(graphContainer);
+
+        const toggleContainer = document.createElement("div");
+        toggleContainer.className = "twse-sort-toggle-container";
+        toggleContainer.style.top =
+          computedStyle.top && computedStyle.top !== "auto"
+            ? computedStyle.top
+            : "10px";
+
+        toggleContainer.innerHTML = `
+          <label class="twse-sort-toggle-label">
+            <input type="checkbox" id="twse-war-sort-checkbox" class="twse-sort-toggle-checkbox" ${
+              twseconfig.war_sorting ? "checked" : ""
+            } />
+            TWSE Sort
+          </label>
+        `;
+
+        graphContainer.parentNode.insertBefore(toggleContainer, graphContainer);
+        log.info(
+          "Successfully injected war sorting toggle checkbox before Graph link.",
+        );
+        injectedToggle = true;
+
+        const checkbox = toggleContainer.querySelector<HTMLInputElement>(
+          "#twse-war-sort-checkbox",
+        );
+        if (checkbox) {
+          checkbox.addEventListener("change", (e) => {
+            const isChecked = (e.target as HTMLInputElement).checked;
+            log.info(`War sorting configuration changed: ${isChecked}`);
+            twseconfig.war_sorting = isChecked;
+          });
+        }
+      };
+
+      injectSortingToggle(descriptions);
+      observeElement(descriptions, () => {
+        if (!injectedToggle) {
+          injectSortingToggle(descriptions);
+        }
+        if (!foundWar && descriptions.querySelector(".faction-war")) {
+          foundWar = true;
+          extractAllMemberLis();
+          const ids = getFactionIds();
+          ids.forEach(populateCachedStatus);
+          updateStatuses();
+        }
+      });
+
+      if (descriptions.querySelector(".faction-war")) {
         foundWar = true;
         extractAllMemberLis();
         const ids = getFactionIds();
         ids.forEach(populateCachedStatus);
         updateStatuses();
-        return;
-      }
-
-      if (foundWar) return;
-
-      const descriptions = factionWarList.querySelector(".descriptions");
-      if (descriptions) {
-        observeElement(descriptions, () => {
-          if (!foundWar && factionWarList.querySelector(".faction-war")) {
-            foundWar = true;
-            extractAllMemberLis();
-            const ids = getFactionIds();
-            ids.forEach(populateCachedStatus);
-            updateStatuses();
-          }
-        });
       }
     };
 
     // Find and watch the active war DOM node
     const factWarList = await waitForElement("#faction_war_list_id");
     if (factWarList) {
-      initWarMonitoring(factWarList);
+      const descriptionsObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (
+              node instanceof HTMLElement &&
+              node.classList.contains("descriptions")
+            ) {
+              log.info("Observed descriptions container added to DOM");
+              initWarMonitoring(node);
+            }
+          }
+        }
+      });
+      descriptionsObserver.observe(factWarList, { childList: true });
+
+      const existingDescriptions = factWarList.querySelector(".descriptions");
+      if (existingDescriptions) {
+        log.info("Found existing descriptions container");
+        initWarMonitoring(existingDescriptions);
+      }
     }
 
     // Set polling timers (updates statuses from API every 10 seconds)
