@@ -30,3 +30,5 @@ dist-dev/
 # Operating System Files
 .DS_Store
 Thumbs.db
+
+/dummy-non-existing-folder

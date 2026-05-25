@@ -12,7 +12,8 @@
     "dev:tm": "concurrently -k -r \"bun:build:dev:watch\" \"bun:serve:dist\"",
     "biome": "biome check --write",
     "lint": "biome check && tsc --noEmit",
-    "test": "bun --bun vitest run"
+    "test": "bun --bun vitest run",
+    "release": "bun run scripts/release.ts"
   },
   "dependencies": {
     "vite": "^7.3.3",
