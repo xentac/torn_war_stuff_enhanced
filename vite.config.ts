@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       monkey({
         entry: "src/index.ts",
         build: {
-          fileName: "torn_war_stuff_enhanced.user.js",
+          fileName: isDev ? "torn_war_stuff_enhanced.dev.user.js" : "torn_war_stuff_enhanced.user.js",
           cssSideEffects: (css) => {
             const style = document.createElement("style");
             style.textContent = css;
@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
           },
         },
         userscript: {
-          name: "Torn War Stuff Enhanced",
+          name: isDev ? "Torn War Stuff Enhanced (dev)" : "Torn War Stuff Enhanced",
           namespace: "namespace",
           version: version,
           description:
