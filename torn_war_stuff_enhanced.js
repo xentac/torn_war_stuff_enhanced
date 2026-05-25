@@ -12,7 +12,7 @@
 // @connect      api.torn.com
 // ==/UserScript==
 
-(async function () {
+(async () => {
   ("use strict");
 
   if (document.querySelector("div#FFScouterV2DisableWarMonitor")) {
@@ -36,7 +36,7 @@
   const STATUS_DIFFERS = "data-twse-status-differs";
 
   try {
-    GM_registerMenuCommand("Set Api Key", function () {
+    GM_registerMenuCommand("Set Api Key", () => {
       checkApiKey(false);
     });
   } catch (error) {
@@ -50,7 +50,7 @@
       apiKey.indexOf("PDA-APIKEY") > -1 ||
       apiKey.length != 16
     ) {
-      let userInput = prompt(
+      const userInput = prompt(
         "Please enter a PUBLIC Api Key, it will be used to get basic faction information:",
         apiKey ?? "",
       );
@@ -648,7 +648,7 @@
       let data_location = "";
       switch (status.state) {
         case "Abroad":
-        case "Traveling":
+        case "Traveling": {
           // API says they're traveling but site has updated. Trust the site and sort them to the top.
           if (
             !(
@@ -710,8 +710,9 @@
             status_DIV.style.setProperty("--twse-content", `"${content}"`);
           }
           break;
+        }
         case "Hospital":
-        case "Jail":
+        case "Jail": {
           let now = new Date().getTime() / 1000;
           if (window.getCurrentTimestamp) {
             now = window.getCurrentTimestamp() / 1000;
@@ -760,6 +761,7 @@
             deferredWrites.push([status_DIV, HIGHLIGHT, "false"]);
           }
           break;
+        }
 
         default:
           status_DIV.style.setProperty(
@@ -787,7 +789,6 @@
       for (let i = 0; i < nodes.length; i++) {
         if (nodes[i].getAttribute("data-ffscouter-active-filter") !== "true") {
           dirtySort = true;
-          continue;
         }
       }
     }
@@ -807,8 +808,8 @@
         if (sorted_column["column"] != "status") {
           continue;
         }
-        let lis = nodes[i].childNodes;
-        let sorted_lis = Array.from(lis).sort((a, b) => {
+        const lis = nodes[i].childNodes;
+        const sorted_lis = Array.from(lis).sort((a, b) => {
           let left = a;
           let right = b;
           if (sorted_column["order"] == "desc") {

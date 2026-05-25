@@ -1,4 +1,4 @@
-import { TimestampSec } from "./types";
+import type { TimestampSec } from "./types";
 
 /**
  * Gets the current timestamp in seconds.
@@ -21,7 +21,7 @@ export function getCurrentTimeSec(): TimestampSec {
  */
 export function pad_with_zeros(n: number): string {
   if (n < 10) {
-    return "0" + n;
+    return `0${n}`;
   }
   return String(n);
 }
@@ -32,7 +32,7 @@ export function pad_with_zeros(n: number): string {
 export function calc_delta(
   delta: number,
   include_seconds = true,
-  pad_hour = true
+  pad_hour = true,
 ): string {
   const s = Math.floor(delta % 60);
   const m = Math.floor((delta / 60) % 60);
@@ -41,4 +41,3 @@ export function calc_delta(
 
   return hour_minute + (include_seconds ? `:${pad_with_zeros(s)}` : "");
 }
-

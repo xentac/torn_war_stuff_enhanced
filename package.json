@@ -4,6 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "dev": "vite",
+    "dev:tm": "vite --mode dev",
     "build": "vite build",
     "build:safe": "tsc && vite build",
     "biome": "biome check --write",

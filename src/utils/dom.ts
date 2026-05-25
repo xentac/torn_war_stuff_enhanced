@@ -6,7 +6,7 @@ import logger from "./logger";
  */
 export function waitForElement<T extends Element>(
   selector: string,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
 ): Promise<T | null> {
   return new Promise((resolve) => {
     const existing = document.querySelector<T>(selector);
@@ -44,7 +44,7 @@ export function waitForElement<T extends Element>(
 export function observeElement(
   target: Node,
   callback: MutationCallback,
-  options: MutationObserverInit = { childList: true, subtree: true }
+  options: MutationObserverInit = { childList: true, subtree: true },
 ): MutationObserver {
   const observer = new MutationObserver((mutations, obs) => {
     if (!target.isConnected) {

@@ -1,0 +1,52 @@
+.members-list li:has(div.status[data-twse-highlight="true"]) {
+  background-color: #99eb99 !important;
+}
+.members-list li:has(div.status[data-twse-status-differs="true"]) {
+  background-color: #c4974c !important;
+}
+.members-list div.status[data-twse-traveling="true"]::after {
+  color: #696026 !important;
+}
+
+:root .dark-mode .members-list li:has(div.status[data-twse-highlight="true"]) {
+  background-color: #446944 !important;
+}
+:root
+  .dark-mode
+  .members-list
+  li:has(div.status[data-twse-status-differs="true"]) {
+  background-color: #795315 !important;
+}
+:root .dark-mode .members-list div.status[data-twse-traveling="true"]::after {
+  color: #ffed76 !important;
+}
+
+.members-list div.status {
+  position: relative !important;
+  color: transparent !important;
+}
+.members-list div.status::after {
+  content: var(--twse-content);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% - 10px);
+  height: 100%;
+  background: inherit;
+  display: flex;
+  right: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.members-list .ok.status::after {
+  color: var(--user-status-green-color);
+}
+
+.members-list .not-ok.status::after {
+  color: var(--user-status-red-color);
+}
+
+.members-list .abroad.status::after,
+.members-list .traveling.status::after {
+  color: var(--user-status-blue-color);
+}

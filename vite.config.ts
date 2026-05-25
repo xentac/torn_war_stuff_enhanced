@@ -1,7 +1,7 @@
+import path from "node:path";
 import { defineConfig } from "vite";
 import monkey from "vite-plugin-monkey";
 import { vitePluginVersionMark } from "vite-plugin-version-mark";
-import path from "node:path";
 
 export default defineConfig(({ mode }) => {
   const isDev = mode === "dev";
@@ -29,20 +29,14 @@ export default defineConfig(({ mode }) => {
           name: "Torn War Stuff Enhanced",
           namespace: "namespace",
           version: version,
-          description: "Show travel status and hospital time and sort by hospital time on war page.",
+          description:
+            "Show travel status and hospital time and sort by hospital time on war page.",
           author: "xentac",
           license: "MIT",
-          match: [
-            "https://www.torn.com/factions.php*"
-          ],
-          grant: [
-            "GM_addStyle",
-            "GM_registerMenuCommand"
-          ],
-          connect: [
-            "api.torn.com"
-          ],
-          "run-at": "document-end"
+          match: ["https://www.torn.com/factions.php*"],
+          grant: ["GM_addStyle", "GM_registerMenuCommand"],
+          connect: ["api.torn.com"],
+          "run-at": "document-end",
         },
       }),
     ],
@@ -50,6 +44,7 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@utils": path.resolve(__dirname, "src/utils"),
         "@features": path.resolve(__dirname, "src/features"),
+        "@ui": path.resolve(__dirname, "src/ui"),
       },
     },
     build: {

@@ -31,7 +31,7 @@ const TRAVELING_REGEX = /Traveling from ([\S ]+) to ([\S ]+)/;
  * Extracts and maps standard destinations from travel status text.
  */
 export function extract_destinations_from_description(
-  description: string
+  description: string,
 ): FlightRoute | null {
   if (!description.startsWith("Traveling from")) {
     return null;

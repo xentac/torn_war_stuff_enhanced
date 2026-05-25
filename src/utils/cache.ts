@@ -1,5 +1,5 @@
-import { FactionMemberStatus } from "./types";
 import logger from "./logger";
+import type { FactionMemberStatus } from "./types";
 
 export class FactionCache {
   private prefix = "xentac-torn_war_stuff_enhanced-status-";
@@ -39,7 +39,10 @@ export class FactionCache {
   /**
    * Caches the status for a faction.
    */
-  public set(factionId: string, status: Record<string, FactionMemberStatus>): void {
+  public set(
+    factionId: string,
+    status: Record<string, FactionMemberStatus>,
+  ): void {
     try {
       const key = `${this.prefix}${factionId}`;
       const cacheItem = {

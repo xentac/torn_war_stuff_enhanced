@@ -1,10 +1,11 @@
-import { Feature, StartTime } from "../feature";
 import { twseconfig } from "@utils/config";
 import logger from "@utils/logger";
+import { type Feature, StartTime } from "../feature";
 
 const KeyManagerFeature: Feature = {
   name: "Key Manager",
-  description: "Allows the user to register their Torn API key via a Tampermonkey menu command",
+  description:
+    "Allows the user to register their Torn API key via a Tampermonkey menu command",
   executionTime: StartTime.DocumentEnd,
 
   shouldRun(): boolean {

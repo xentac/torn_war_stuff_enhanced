@@ -41,13 +41,14 @@ export class Storage {
     expireConfig?: {
       amount: number;
       unit: Time;
-    }
+    },
   ): void {
     try {
       const item: StorageItem<T> = {
         value,
         expiration: expireConfig
-          ? Date.now() + expireConfig.amount * (expireConfig.unit || Time.Minutes)
+          ? Date.now() +
+            expireConfig.amount * (expireConfig.unit || Time.Minutes)
           : null,
       };
       localStorage.setItem(this.prefix + key, JSON.stringify(item));
