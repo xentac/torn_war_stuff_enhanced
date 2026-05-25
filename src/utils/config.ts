@@ -1,3 +1,4 @@
+import logger, { LogLevel } from "./logger";
 import { Storage } from "./storage";
 
 enum CONFIG_KEYS {
@@ -12,6 +13,8 @@ export class Config {
 
   constructor(prefix = "twse-config-") {
     this.storage = new Storage(prefix);
+    // Initialize the logger level dynamically from the stored configuration
+    logger.setLevel(this.debug_logs ? LogLevel.DEBUG : LogLevel.INFO);
   }
 
   /**
@@ -52,6 +55,7 @@ export class Config {
 
   set debug_logs(val: boolean) {
     this.storage.set(CONFIG_KEYS.DEBUG_LOGS, val);
+    logger.setLevel(val ? LogLevel.DEBUG : LogLevel.INFO);
   }
 
   /**
