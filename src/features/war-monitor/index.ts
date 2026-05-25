@@ -14,6 +14,51 @@ import { type Feature, StartTime } from "../feature";
 
 const log = logger.child("feature:war-monitor");
 
+async function copyToClipboard(text: string): Promise<boolean> {
+  // 1. Try Torn PDA handler if present
+  if (
+    typeof window !== "undefined" &&
+    (window as any).flutter_inappwebview &&
+    typeof (window as any).flutter_inappwebview.callHandler === "function"
+  ) {
+    try {
+      await (window as any).flutter_inappwebview.callHandler(
+        "copyToClipboard",
+        text,
+      );
+      return true;
+    } catch (err) {
+      log.error("Failed to copy using Torn PDA callHandler", err);
+    }
+  }
+
+  // 2. Try Standard navigator.clipboard API
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (err) {
+    log.error("Failed to copy using clipboard API", err);
+  }
+
+  // 3. Fallback to execCommand
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const success = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return success;
+  } catch (err) {
+    log.error("Failed to copy using fallback", err);
+    return false;
+  }
+}
+
 interface MemberLiRef {
   li: HTMLLIElement;
   statusDiv: HTMLDivElement | null;
@@ -56,6 +101,50 @@ const WarMonitorFeature: Feature = {
       pageVisible = !document.hidden;
     });
 
+    function injectCopyButton(id: string, li: HTMLLIElement) {
+      if (li.querySelector(".twse-copy-btn")) return;
+
+      const atag = li.querySelector<HTMLAnchorElement>(
+        "a[href^='/profiles.php']",
+      );
+      if (!atag) return;
+
+      const parent = li.querySelector<HTMLElement>(".member");
+      if (!parent) return;
+
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "twse-copy-btn";
+      copyBtn.type = "button";
+      copyBtn.title = "Copy Name [ID]";
+      copyBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      `;
+
+      copyBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const name = atag.textContent?.trim() || "";
+        const copyText = `${name} [${id}]`;
+
+        const success = await copyToClipboard(copyText);
+        if (success) {
+          copyBtn.classList.add("success");
+          copyBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon-success"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          `;
+          setTimeout(() => {
+            copyBtn.classList.remove("success");
+            copyBtn.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            `;
+          }, 1000);
+        }
+      });
+
+      parent.appendChild(copyBtn);
+    }
+
     // Extract faction member list details
     function extractAllMemberLis() {
       memberLis.clear();
@@ -74,6 +163,7 @@ const WarMonitorFeature: Feature = {
             li,
             statusDiv: li.querySelector<HTMLDivElement>("div.status"),
           });
+          injectCopyButton(id, li);
         });
       });
     }

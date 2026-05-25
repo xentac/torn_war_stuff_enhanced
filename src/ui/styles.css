@@ -74,3 +74,52 @@
   width: 13px;
   height: 13px;
 }
+
+.members-list li [class*="member"] {
+  position: relative !important;
+  display: flex !important;
+  align-items: center;
+}
+
+.twse-copy-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #888;
+  transition:
+    color 0.15s,
+    background-color 0.15s,
+    transform 0.1s;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.twse-copy-btn:hover {
+  color: #333;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+:root .dark-mode .twse-copy-btn:hover {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.twse-copy-btn:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
+.twse-copy-btn.success {
+  color: #449944 !important;
+}
+
+:root .dark-mode .twse-copy-btn.success {
+  color: #69eb69 !important;
+}

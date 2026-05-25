@@ -28,6 +28,33 @@ class MockElement {
   public id = "";
   public className = "";
   public textContent = "";
+  public checked = false;
+
+  get href() {
+    return this.getAttribute("href") || "";
+  }
+  set href(val: string) {
+    this.setAttribute("href", val);
+  }
+
+  get classList() {
+    return {
+      add: (cls: string) => {
+        if (!this.className.includes(cls)) {
+          this.className = this.className ? `${this.className} ${cls}` : cls;
+        }
+      },
+      remove: (cls: string) => {
+        this.className = this.className
+          .split(" ")
+          .filter((c) => c !== cls)
+          .join(" ");
+      },
+      contains: (cls: string) => {
+        return this.className.split(" ").includes(cls);
+      },
+    };
+  }
   public style = {
     getPropertyValue: () => "",
     setProperty: () => {},
@@ -35,6 +62,10 @@ class MockElement {
   public attributes: Record<string, string> = {};
   public parentNode: MockElement | null = null;
   public children: MockElement[] = [];
+
+  get parentElement() {
+    return this.parentNode;
+  }
 
   constructor(tagName: string) {
     this.tagName = tagName.toUpperCase();
@@ -97,6 +128,13 @@ class MockElement {
       // e.g. [class*="graphIcon"]
       return this.findRecursive((el) => el.className.includes("graphIcon"));
     }
+    if (selector.startsWith("a[href")) {
+      return this.findRecursive(
+        (el) =>
+          el.tagName === "A" &&
+          (el.getAttribute("href")?.includes("/profiles.php") ?? false),
+      );
+    }
     return this.findRecursive((el) => el.tagName === selector.toUpperCase());
   }
 
@@ -105,6 +143,18 @@ class MockElement {
     this.findAllRecursive((el) => {
       if (selector === "span" && el.tagName === "SPAN") return true;
       if (selector === "a" && el.tagName === "A") return true;
+      if (
+        selector === "ul.members-list" &&
+        el.tagName === "UL" &&
+        el.className.includes("members-list")
+      )
+        return true;
+      if (
+        selector === "li.enemy, li.your" &&
+        el.tagName === "LI" &&
+        (el.className.includes("enemy") || el.className.includes("your"))
+      )
+        return true;
       return false;
     }, res);
     return res;
@@ -139,7 +189,19 @@ class MockElement {
   dispatchEvent(event: any) {
     const type = event.type || event;
     const list = this.listeners[type] || [];
-    for (const cb of list) cb({ target: this });
+    const ev = typeof event === "object" ? event : { type };
+    try {
+      ev.preventDefault = ev.preventDefault || (() => {});
+      ev.stopPropagation = ev.stopPropagation || (() => {});
+    } catch {}
+    try {
+      Object.defineProperty(ev, "target", {
+        value: ev.target || this,
+        writable: true,
+        configurable: true,
+      });
+    } catch {}
+    for (const cb of list) cb(ev);
     return true;
   }
 
@@ -251,6 +313,92 @@ describe("WarMonitorFeature Sorting Config", () => {
       checkbox.checked = true;
       checkbox.dispatchEvent(new Event("change"));
       expect(twseconfig.war_sorting).toBe(true);
+    }
+  });
+
+  it("should inject copy buttons on player name columns and support standard/Torn PDA clipboard", async () => {
+    // 1. Setup mock faction war DOM layout
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+
+    const li = new MockElement("li");
+    li.className = "enemy";
+
+    const memberCol = new MockElement("div");
+    memberCol.className = "member";
+
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/profiles.php?ID=12345");
+    atag.textContent = "Astrobelt";
+
+    const statusDiv = new MockElement("div");
+    statusDiv.className = "status ok";
+
+    memberCol.appendChild(atag);
+    li.appendChild(memberCol);
+    li.appendChild(statusDiv);
+    ul.appendChild(li);
+    descriptions.appendChild(ul);
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    // 2. Set up navigator.clipboard and Torn PDA webview mocks
+    const clipboardWriteMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(global.navigator, "clipboard", {
+      value: {
+        writeText: clipboardWriteMock,
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    const pdaCallHandlerMock = vi.fn().mockResolvedValue(undefined);
+    (global.window as any).flutter_inappwebview = {
+      callHandler: pdaCallHandlerMock,
+    };
+
+    // 3. Run feature
+    WarMonitorFeature.run();
+
+    // Wait for the Microtask/Macrotask queue to clear
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Verify copy button is injected inside the member column container
+    const copyBtn = memberCol.querySelector(".twse-copy-btn");
+    expect(copyBtn).not.toBeNull();
+
+    // 4. Test copying with Torn PDA
+    if (copyBtn) {
+      await copyBtn.dispatchEvent(new Event("click"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      // It should prefer Torn PDA's flutter_inappwebview.callHandler first!
+      expect(pdaCallHandlerMock).toHaveBeenCalledWith(
+        "copyToClipboard",
+        "Astrobelt [12345]",
+      );
+      expect(clipboardWriteMock).not.toHaveBeenCalled();
+      expect(copyBtn.className).toContain("success");
+    }
+
+    // Reset mocks
+    pdaCallHandlerMock.mockClear();
+    clipboardWriteMock.mockClear();
+
+    // 5. Test fallback to standard navigator.clipboard
+    (global.window as any).flutter_inappwebview = undefined;
+    if (copyBtn) {
+      // Remove success class to test again
+      copyBtn.className = "twse-copy-btn";
+      await copyBtn.dispatchEvent(new Event("click"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(clipboardWriteMock).toHaveBeenCalledWith("Astrobelt [12345]");
+      expect(copyBtn.className).toContain("success");
     }
   });
 });
