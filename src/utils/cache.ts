@@ -1,6 +1,8 @@
 import logger from "./logger";
 import type { FactionMemberStatus } from "./types";
 
+const log = logger.child("cache");
+
 export class FactionCache {
   private prefix = "xentac-torn_war_stuff_enhanced-status-";
   private ttlMs = 10_000; // 10 seconds TTL
@@ -30,7 +32,7 @@ export class FactionCache {
 
       return parsed.status as Record<string, FactionMemberStatus>;
     } catch (e) {
-      logger.error(`Error reading cached status for faction ${factionId}:`, e);
+      log.error(`Error reading cached status for faction ${factionId}:`, e);
       this.remove(factionId);
       return null;
     }
@@ -51,7 +53,7 @@ export class FactionCache {
       };
       localStorage.setItem(key, JSON.stringify(cacheItem));
     } catch (e) {
-      logger.error(`Error caching status for faction ${factionId}:`, e);
+      log.error(`Error caching status for faction ${factionId}:`, e);
     }
   }
 
@@ -63,7 +65,7 @@ export class FactionCache {
       const key = `${this.prefix}${factionId}`;
       localStorage.removeItem(key);
     } catch (e) {
-      logger.error(`Error removing cached status for faction ${factionId}:`, e);
+      log.error(`Error removing cached status for faction ${factionId}:`, e);
     }
   }
 
@@ -102,10 +104,10 @@ export class FactionCache {
       }
 
       if (cleanedCount > 0) {
-        logger.info(`Cleaned ${cleanedCount} expired cached statuses`);
+        log.info(`Cleaned ${cleanedCount} expired cached statuses`);
       }
     } catch (e) {
-      logger.error("Error sweeping expired cached statuses:", e);
+      log.error("Error sweeping expired cached statuses:", e);
     }
   }
 }

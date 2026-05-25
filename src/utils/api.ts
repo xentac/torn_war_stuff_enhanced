@@ -2,6 +2,8 @@ import { twseconfig } from "./config";
 import logger from "./logger";
 import type { FactionResponse } from "./types";
 
+const log = logger.child("api");
+
 export class TornApiClient {
   private baseUrl = "https://api.torn.com/faction/";
 
@@ -14,7 +16,7 @@ export class TornApiClient {
   ): Promise<FactionResponse | null> {
     const key = twseconfig.apiKey;
     if (!key || key === "###PDA-APIKEY###" || key.length !== 16) {
-      logger.warn("Torn API key is invalid or not set. Skipping API request.");
+      log.warn("Torn API key is invalid or not set. Skipping API request.");
       return null;
     }
 
@@ -28,7 +30,7 @@ export class TornApiClient {
 
       const data = (await response.json()) as FactionResponse;
       if (data.error) {
-        logger.error(
+        log.error(
           `Torn API returned error code ${data.error.code}: ${data.error.error}`,
         );
         return data; // Return the response containing the error object so caller can handle rate limits / bad keys
@@ -36,7 +38,7 @@ export class TornApiClient {
 
       return data;
     } catch (e) {
-      logger.error(
+      log.error(
         `Network or parse error fetching faction ${factionId} data:`,
         e,
       );

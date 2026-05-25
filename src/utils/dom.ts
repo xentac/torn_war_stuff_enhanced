@@ -1,5 +1,7 @@
 import logger from "./logger";
 
+const log = logger.child("dom");
+
 /**
  * Waits for a DOM element matching a selector to be present in the document.
  * Leverages a MutationObserver for maximum responsiveness.
@@ -30,7 +32,7 @@ export function waitForElement<T extends Element>(
     if (timeoutMs > 0) {
       setTimeout(() => {
         observer.disconnect();
-        logger.debug(`Timeout waiting for element selector: '${selector}'`);
+        log.debug(`Timeout waiting for element selector: '${selector}'`);
         resolve(null);
       }, timeoutMs);
     }

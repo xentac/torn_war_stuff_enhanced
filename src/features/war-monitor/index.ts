@@ -12,6 +12,8 @@ import type { FactionMemberStatus } from "@utils/types";
 import "@ui/styles.css";
 import { type Feature, StartTime } from "../feature";
 
+const log = logger.child("feature:war-monitor");
+
 interface MemberLiRef {
   li: HTMLLIElement;
   statusDiv: HTMLDivElement | null;
@@ -141,7 +143,7 @@ const WarMonitorFeature: Feature = {
       for (const [id, status] of Object.entries(cached)) {
         memberStatus.set(id, status);
       }
-      logger.info(
+      log.info(
         `Populated war monitor cache with stored statuses for faction: ${factionId}`,
       );
     }
@@ -200,13 +202,13 @@ const WarMonitorFeature: Feature = {
       lastRequestTime = now;
 
       for (const factionId of factionIds) {
-        logger.debug(`Fetching API status update for faction: ${factionId}`);
+        log.debug(`Fetching API status update for faction: ${factionId}`);
         const data = await tornApi.fetchFactionData(factionId);
         if (!data) continue;
 
         if (data.error) {
           if (tornApi.isUnrecoverableError(data.error.code)) {
-            logger.error(
+            log.error(
               "Torn API returned unrecoverable error. Halting war monitor polling.",
             );
             running = false;
@@ -560,7 +562,7 @@ const WarMonitorFeature: Feature = {
     }
 
     const initWarMonitoring = (factionWarList: Element) => {
-      logger.info("Faction war list detected. Starting observation.");
+      log.info("Faction war list detected. Starting observation.");
       if (factionWarList.querySelector(".faction-war")) {
         foundWar = true;
         extractAllMemberLis();

@@ -2,6 +2,8 @@ import { twseconfig } from "@utils/config";
 import logger from "@utils/logger";
 import { type Feature, StartTime } from "../feature";
 
+const log = logger.child("feature:key-manager");
+
 const KeyManagerFeature: Feature = {
   name: "Key Manager",
   description:
@@ -22,16 +24,16 @@ const KeyManagerFeature: Feature = {
           const trimmedKey = key.trim();
           if (trimmedKey.length === 16 || trimmedKey === "") {
             twseconfig.apiKey = trimmedKey;
-            logger.info("Successfully updated API Key registration");
+            log.info("Successfully updated API Key registration");
             alert("Torn API key registered successfully!");
           } else {
             alert("Invalid key! A Torn API key must be exactly 16 characters.");
           }
         }
       });
-      logger.debug("Tampermonkey menu command 'Register Key' initialized");
+      log.debug("Tampermonkey menu command 'Register Key' initialized");
     } else {
-      logger.warn("GM_registerMenuCommand is not available in this context.");
+      log.warn("GM_registerMenuCommand is not available in this context.");
     }
   },
 };

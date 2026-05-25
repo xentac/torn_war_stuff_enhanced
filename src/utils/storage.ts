@@ -1,5 +1,7 @@
 import logger from "./logger";
 
+const log = logger.child("storage");
+
 export enum Time {
   Seconds = 1_000,
   Minutes = Seconds * 60,
@@ -53,7 +55,7 @@ export class Storage {
       };
       localStorage.setItem(this.prefix + key, JSON.stringify(item));
     } catch (error) {
-      logger.error(`Error storing item '${key}':`, error);
+      log.error(`Error storing item '${key}':`, error);
     }
   }
 
@@ -78,20 +80,20 @@ export class Storage {
       }
 
       if (!item) {
-        logger.warn(`Key '${key}' has invalid JSON in it.`);
+        log.warn(`Key '${key}' has invalid JSON in it.`);
         this.remove(key);
         return null;
       }
 
       if (item.expiration && Date.now() > item.expiration) {
         this.remove(key);
-        logger.debug(`Key '${key}' has expired.`);
+        log.debug(`Key '${key}' has expired.`);
         return null;
       }
 
       return item.value;
     } catch (error) {
-      logger.error(`Error retrieving item '${key}':`, error);
+      log.error(`Error retrieving item '${key}':`, error);
       return null;
     }
   }
@@ -104,7 +106,7 @@ export class Storage {
     try {
       localStorage.removeItem(this.prefix + key);
     } catch (error) {
-      logger.error(`Error removing item '${key}':`, error);
+      log.error(`Error removing item '${key}':`, error);
     }
   }
 
@@ -128,7 +130,7 @@ export class Storage {
           localStorage.removeItem(key);
         });
     } catch (error) {
-      logger.error("Error clearing storage:", error);
+      log.error("Error clearing storage:", error);
     }
   }
 }

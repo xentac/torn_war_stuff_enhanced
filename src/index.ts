@@ -2,8 +2,10 @@ import { Features } from "./features";
 import { StartTime } from "./features/feature";
 import logger from "./utils/logger";
 
+const log = logger.child("boot");
+
 async function boot() {
-  logger.info("Initializing Torn War Stuff Enhanced...");
+  log.info("Initializing Torn War Stuff Enhanced...");
 
   for (const feature of Features) {
     try {
@@ -12,7 +14,7 @@ async function boot() {
         continue;
       }
 
-      logger.debug(`Booting feature: '${feature.name}'`);
+      log.debug(`Booting feature: '${feature.name}'`);
 
       if (feature.executionTime === StartTime.DocumentStart) {
         feature.run();
@@ -55,7 +57,7 @@ async function boot() {
         }
       }
     } catch (e) {
-      logger.error(`Error running feature '${feature.name}':`, e);
+      log.error(`Error running feature '${feature.name}':`, e);
     }
   }
 }
