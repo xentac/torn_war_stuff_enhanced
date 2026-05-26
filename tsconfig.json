@@ -9,6 +9,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "paths": {
       "@utils/*": ["src/utils/*"],
       "@features/*": ["src/features/*"],

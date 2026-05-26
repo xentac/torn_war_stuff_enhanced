@@ -110,6 +110,27 @@ export class FactionCache {
       log.error("Error sweeping expired cached statuses:", e);
     }
   }
+
+  /**
+   * Clears all cached statuses from localStorage.
+   */
+  public clearAll(): void {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(this.prefix)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((key) => {
+        localStorage.removeItem(key);
+      });
+      log.info(`Cleared all cached faction statuses`);
+    } catch (e) {
+      log.error("Error clearing cached statuses:", e);
+    }
+  }
 }
 
 export const factionCache = new FactionCache();

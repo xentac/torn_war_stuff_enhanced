@@ -98,6 +98,20 @@ const WarMonitorFeature: Feature = {
     // 1. Clean expired cache records on start
     factionCache.cleanExpired();
 
+    const syncBodyClasses = () => {
+      document.body.classList.toggle(
+        "twse-copy-disabled",
+        !twseconfig.copy_button_enabled,
+      );
+      document.body.classList.toggle(
+        "twse-bubble-disabled",
+        !twseconfig.bubble_enabled,
+      );
+    };
+
+    // Synchronize initial configuration classes
+    syncBodyClasses();
+
     let running = true;
     let foundWar = false;
     let pageVisible = !document.hidden;
@@ -113,6 +127,27 @@ const WarMonitorFeature: Feature = {
     const minTimeBetweenRequestsMs = 10_000;
 
     const activeChains = new Map<string, ActiveChainState>();
+
+    // Wire global event listeners for instant UI state synchronization
+    const onConfigUpdated = () => {
+      syncBodyClasses();
+      const checkbox = document.querySelector<HTMLInputElement>(
+        "#twse-war-sort-checkbox",
+      );
+      if (checkbox) {
+        checkbox.checked = twseconfig.war_sorting;
+      }
+    };
+    window.addEventListener("twse-config-updated", onConfigUpdated);
+
+    const onClearCache = () => {
+      log.info("Received twse-clear-cache event. Purging all caches.");
+      memberStatus.clear();
+      factionCache.clearAll();
+      activeChains.clear();
+      updateStatuses();
+    };
+    window.addEventListener("twse-clear-cache", onClearCache);
 
     let bubbleContainer = document.getElementById(
       "twse-chain-bubble",

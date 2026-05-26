@@ -238,3 +238,140 @@
     box-shadow: 0 0 8px rgba(255, 82, 82, 0.8);
   }
 }
+
+/* ============================================================================
+   TWSE Settings Panel Premium Aesthetic Styles & Body Visibility Toggles
+   ============================================================================ */
+
+/* Clean visibility toggles using body-level configuration classes */
+body.twse-copy-disabled .twse-copy-btn {
+  display: none !important;
+}
+body.twse-bubble-disabled #twse-chain-bubble {
+  display: none !important;
+}
+
+body {
+  --twse-bg-color: #f0f0f0;
+  --twse-alt-bg-color: #fff;
+  --twse-border-color: #ccc;
+  --twse-input-color: #333;
+  --twse-text-color: #000;
+  --twse-hover-color: #ddd;
+  --twse-glow-color: #4caf50;
+  --twse-success-color: #4caf50;
+}
+
+:root .dark-mode {
+  --twse-bg-color: #333;
+  --twse-alt-bg-color: #383838;
+  --twse-border-color: #444;
+  --twse-input-color: #ccc;
+  --twse-text-color: #ccc;
+  --twse-hover-color: #555;
+  --twse-glow-color: #4caf50;
+  --twse-success-color: #4caf50;
+}
+
+twse-settings-panel {
+  display: block;
+  margin-top: 20px;
+  clear: both;
+}
+
+twse-settings-panel .accordion {
+  margin: 10px 0;
+  padding: 15px;
+  background-color: var(--twse-bg-color);
+  border: 1px solid var(--twse-border-color);
+  border-radius: 5px;
+  color: var(--twse-text-color);
+  font-family:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+twse-settings-panel .accordion.glow {
+  border-color: var(--twse-glow-color);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+twse-settings-panel .input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+twse-settings-panel .input-row-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+twse-settings-panel .input-row-inline input[type="checkbox"] {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+twse-settings-panel .input-row-inline label {
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+twse-settings-panel .blur-mode {
+  filter: blur(4px);
+  transition: filter 0.2s ease;
+}
+
+twse-settings-panel .blur-mode:hover,
+twse-settings-panel .blur-mode:focus {
+  filter: blur(0);
+}
+
+twse-settings-panel input[type="text"] {
+  box-sizing: border-box;
+  text-align: left;
+  vertical-align: top;
+  width: 250px;
+  height: 34px;
+  margin-right: 8px;
+  padding: 8px 10px;
+  line-height: 14px;
+  display: inline-block;
+  border: 1px solid var(--twse-border-color);
+  border-radius: 5px;
+  background-color: var(--twse-alt-bg-color);
+  color: var(--twse-text-color);
+  outline: none;
+}
+
+twse-settings-panel input[type="text"]:focus {
+  border-color: var(--twse-glow-color);
+}
+
+twse-settings-panel .twse-api-explanation {
+  background-color: var(--twse-alt-bg-color);
+  border: 1px solid var(--twse-border-color);
+  border-radius: 8px;
+  color: var(--twse-text-color);
+  margin-top: 5px;
+  margin-bottom: 5px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 600px;
+}
+
+twse-settings-panel h3 {
+  margin: 20px 0 12px 0;
+  font-size: 14px;
+  font-weight: bold;
+  border-bottom: 1px solid var(--twse-border-color);
+  padding-bottom: 6px;
+}

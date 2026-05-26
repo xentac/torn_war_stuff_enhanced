@@ -53,16 +53,21 @@ class MockElement {
       contains: (cls: string) => {
         return this.className.split(" ").includes(cls);
       },
-      toggle: (cls: string) => {
-        if (this.className.split(" ").includes(cls)) {
+      toggle: (cls: string, force?: boolean) => {
+        const hasCls = this.className.split(" ").includes(cls);
+        const shouldHave = force !== undefined ? force : !hasCls;
+        if (shouldHave) {
+          if (!hasCls) {
+            this.className = this.className ? `${this.className} ${cls}` : cls;
+          }
+          return true;
+        } else {
           this.className = this.className
             .split(" ")
             .filter((c) => c !== cls)
             .join(" ");
           return false;
         }
-        this.className = this.className ? `${this.className} ${cls}` : cls;
-        return true;
       },
     };
   }
@@ -864,5 +869,62 @@ describe("WarMonitorFeature Sorting Config", () => {
 
     spy2.mockRestore();
     vi.useRealTimers();
+  });
+
+  describe("Settings Config Toggles Integration", () => {
+    beforeEach(() => {
+      localStorage.clear();
+      documentMock.body = new MockElement("body");
+      twseconfig.bubble_enabled = true;
+      twseconfig.copy_button_enabled = true;
+    });
+
+    it("should toggle appropriate body classes when configuration is changed", async () => {
+      // 1. Run the feature
+      WarMonitorFeature.run();
+
+      // Wait for Microtask/Macrotask queue to clear
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Initial state: default true meaning no disabled class
+      expect(documentMock.body.className).not.toContain("twse-bubble-disabled");
+      expect(documentMock.body.className).not.toContain("twse-copy-disabled");
+
+      // Toggle configurations
+      twseconfig.bubble_enabled = false;
+      twseconfig.copy_button_enabled = false;
+
+      // Dispatch event to simulate panel saving/config updated
+      window.dispatchEvent(new Event("twse-config-updated"));
+
+      // Verify that classes are correctly updated
+      expect(documentMock.body.className).toContain("twse-bubble-disabled");
+      expect(documentMock.body.className).toContain("twse-copy-disabled");
+
+      // Toggle them back
+      twseconfig.bubble_enabled = true;
+      twseconfig.copy_button_enabled = true;
+      window.dispatchEvent(new Event("twse-config-updated"));
+
+      expect(documentMock.body.className).not.toContain("twse-bubble-disabled");
+      expect(documentMock.body.className).not.toContain("twse-copy-disabled");
+    });
+
+    it("should support purging caches when twse-clear-cache event is dispatched", async () => {
+      const { factionCache } = await import("@utils/cache");
+
+      // Run the feature
+      WarMonitorFeature.run();
+
+      // Wait for Microtask/Macrotask queue to clear
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Dispatch clear cache
+      const clearSpy = vi.spyOn(factionCache, "clearAll");
+      window.dispatchEvent(new Event("twse-clear-cache"));
+
+      expect(clearSpy).toHaveBeenCalled();
+      clearSpy.mockRestore();
+    });
   });
 });

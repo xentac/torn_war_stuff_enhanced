@@ -7,6 +7,8 @@ enum CONFIG_KEYS {
   WAR_SORTING = "war_sorting",
   BUBBLE_POSITION = "bubble_position",
   BUBBLE_MINIMIZED = "bubble_minimized",
+  BUBBLE_ENABLED = "bubble_enabled",
+  COPY_BUTTON_ENABLED = "copy_button_enabled",
 }
 
 export class Config {
@@ -102,6 +104,28 @@ export class Config {
   }
 
   /**
+   * Checks whether the chain bubble is enabled/visible.
+   */
+  get bubble_enabled(): boolean {
+    return this.storage.get<boolean>(CONFIG_KEYS.BUBBLE_ENABLED) ?? true;
+  }
+
+  set bubble_enabled(val: boolean) {
+    this.storage.set(CONFIG_KEYS.BUBBLE_ENABLED, val);
+  }
+
+  /**
+   * Checks whether the player name copy to clipboard button is enabled.
+   */
+  get copy_button_enabled(): boolean {
+    return this.storage.get<boolean>(CONFIG_KEYS.COPY_BUTTON_ENABLED) ?? true;
+  }
+
+  set copy_button_enabled(val: boolean) {
+    this.storage.set(CONFIG_KEYS.COPY_BUTTON_ENABLED, val);
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
@@ -109,6 +133,8 @@ export class Config {
     this.storage.remove(CONFIG_KEYS.WAR_SORTING);
     this.storage.remove(CONFIG_KEYS.BUBBLE_POSITION);
     this.storage.remove(CONFIG_KEYS.BUBBLE_MINIMIZED);
+    this.storage.remove(CONFIG_KEYS.BUBBLE_ENABLED);
+    this.storage.remove(CONFIG_KEYS.COPY_BUTTON_ENABLED);
   }
 }
 
