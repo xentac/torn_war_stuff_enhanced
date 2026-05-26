@@ -134,7 +134,7 @@
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   color: #e0e0e0;
   font-family:
@@ -143,11 +143,10 @@
   line-height: 1.5;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   transition:
     opacity 0.3s ease,
     transform 0.3s ease;
-  min-width: 170px;
+  min-width: 100px;
   pointer-events: auto;
   cursor: grab;
   user-select: none;
@@ -160,12 +159,15 @@
   pointer-events: none;
 }
 
-.twse-chain-bubble.minimized {
-  min-width: unset;
+.twse-chain-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
 }
 
-.twse-chain-bubble.minimized .twse-chain-tag,
-.twse-chain-bubble.minimized .twse-chain-mult {
+.twse-chain-tag,
+.twse-chain-mult {
   display: none;
 }
 
@@ -176,15 +178,11 @@
   gap: 12px;
 }
 
-.twse-chain-tag {
-  font-weight: bold;
-  color: #ffb74d;
-}
-
 .twse-chain-stats {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
 }
 
 .twse-chain-count {
@@ -192,12 +190,8 @@
   color: #fff;
 }
 
-.twse-chain-mult {
-  color: #aaa;
-  font-size: 11px;
-}
-
 .twse-chain-timer {
+  margin-left: auto;
   font-family: monospace;
   font-weight: bold;
   padding: 2px 6px;
@@ -219,8 +213,7 @@
 }
 
 .twse-chain-timer.negative {
-  color: #ffb74d;
-  background: rgba(255, 183, 77, 0.15);
+  color: #ff5252;
 }
 
 .twse-chain-timer.urgent {

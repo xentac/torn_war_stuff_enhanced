@@ -124,6 +124,10 @@ const WarMonitorFeature: Feature = {
       document.body.appendChild(bubbleContainer);
     }
 
+    if (bubbleContainer && !bubbleContainer.querySelector(".twse-chain-body")) {
+      bubbleContainer.innerHTML = `<div class="twse-chain-body"></div>`;
+    }
+
     const getBubbleRect = (): {
       left: number;
       top: number;
@@ -176,13 +180,7 @@ const WarMonitorFeature: Feature = {
         setTimeout(clampToScreen, 0);
       }
 
-      // 2. Recover saved minimized state if exists
-      if (twseconfig.bubble_minimized) {
-        bubbleContainer.classList.add("minimized");
-      }
-
       let isDragging = false;
-      let wasDragged = false;
       let startX = 0;
       let startY = 0;
       let initialX = 0;
@@ -190,9 +188,18 @@ const WarMonitorFeature: Feature = {
 
       const dragStart = (e: MouseEvent | TouchEvent) => {
         isDragging = true;
-        wasDragged = false;
-        const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-        const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
+        const isTouch = e.type === "touchstart";
+        const touchEvent = e as TouchEvent;
+        const mouseEvent = e as MouseEvent;
+        const clientX =
+          isTouch && touchEvent.touches && touchEvent.touches.length > 0
+            ? touchEvent.touches[0].clientX
+            : mouseEvent.clientX;
+        const clientY =
+          isTouch && touchEvent.touches && touchEvent.touches.length > 0
+            ? touchEvent.touches[0].clientY
+            : mouseEvent.clientY;
 
         startX = clientX;
         startY = clientY;
@@ -206,8 +213,8 @@ const WarMonitorFeature: Feature = {
           bubbleContainer.style.cursor = "grabbing";
         }
 
-        // Prevent surrounding text selection and clear active selections
-        if (e.cancelable) {
+        // Prevent surrounding text selection on desktop
+        if (!isTouch && e.cancelable) {
           e.preventDefault();
         }
         window.getSelection()?.removeAllRanges();
@@ -225,15 +232,20 @@ const WarMonitorFeature: Feature = {
           e.preventDefault();
         }
 
-        const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-        const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+        const isTouch = e.type === "touchmove";
+        const touchEvent = e as TouchEvent;
+        const mouseEvent = e as MouseEvent;
+        const clientX =
+          isTouch && touchEvent.touches && touchEvent.touches.length > 0
+            ? touchEvent.touches[0].clientX
+            : mouseEvent.clientX;
+        const clientY =
+          isTouch && touchEvent.touches && touchEvent.touches.length > 0
+            ? touchEvent.touches[0].clientY
+            : mouseEvent.clientY;
 
         const dx = clientX - startX;
         const dy = clientY - startY;
-
-        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-          wasDragged = true;
-        }
 
         const rect = getBubbleRect();
         const w = rect.width;
@@ -259,14 +271,9 @@ const WarMonitorFeature: Feature = {
         if (bubbleContainer) {
           bubbleContainer.style.cursor = "grab";
 
-          if (!wasDragged) {
-            const isMin = bubbleContainer.classList.toggle("minimized");
-            twseconfig.bubble_minimized = isMin;
-          } else {
-            const left = parseFloat(bubbleContainer.style.left) || 0;
-            const top = parseFloat(bubbleContainer.style.top) || 0;
-            twseconfig.bubble_position = { left, top };
-          }
+          const left = parseFloat(bubbleContainer.style.left) || 0;
+          const top = parseFloat(bubbleContainer.style.top) || 0;
+          twseconfig.bubble_position = { left, top };
         }
 
         document.removeEventListener("mousemove", dragMove);
@@ -859,6 +866,9 @@ const WarMonitorFeature: Feature = {
         return;
       }
 
+      const bodyContainer = bubbleContainer.querySelector(".twse-chain-body");
+      if (!bodyContainer) return;
+
       let html = "";
       const now = getCurrentTimeSec();
 
@@ -906,7 +916,7 @@ const WarMonitorFeature: Feature = {
         `;
       });
 
-      bubbleContainer.innerHTML = html;
+      bodyContainer.innerHTML = html;
       bubbleContainer.classList.remove("hidden");
     }
 

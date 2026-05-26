@@ -221,16 +221,61 @@ class MockElement {
 
   private _innerHTML = "";
   get innerHTML() {
+    if (this._innerHTML.includes("twse-chain-body")) {
+      const body = this.children.find((c) => c.className === "twse-chain-body");
+      if (body) {
+        return this._innerHTML.replace(
+          '<div class="twse-chain-body"></div>',
+          `<div class="twse-chain-body">${body.innerHTML}</div>`,
+        );
+      }
+    }
     return this._innerHTML;
   }
   set innerHTML(html: string) {
     this._innerHTML = html;
+    // Clear previous dynamic children to prevent duplicates on redraws
+    this.children = this.children.filter(
+      (c) => c.id === "twse-war-sort-checkbox",
+    );
+
     // Basic parser for our specific template injection
     if (html.includes("twse-war-sort-checkbox")) {
       const checkbox = new MockElement("input");
       checkbox.id = "twse-war-sort-checkbox";
       checkbox.setAttribute("type", "checkbox");
       this.appendChild(checkbox);
+    }
+
+    if (html.includes("minimize-btn")) {
+      const button = new MockElement("button");
+      button.className = "twse-chain-toggle-btn minimize-btn";
+      this.appendChild(button);
+    }
+
+    if (html.includes("expand-btn")) {
+      const button = new MockElement("button");
+      button.className = "twse-chain-toggle-btn expand-btn";
+      this.appendChild(button);
+    }
+
+    if (html.includes("twse-chain-body")) {
+      const body = new MockElement("div");
+      body.className = "twse-chain-body";
+      this.appendChild(body);
+    }
+
+    // Fallback parser for transitional/older elements
+    if (
+      html.includes("twse-chain-toggle-btn") &&
+      !html.includes("minimize-btn") &&
+      !html.includes("expand-btn")
+    ) {
+      const button = new MockElement("button");
+      button.className = html.includes("twse-chain-toggle-btn minimized")
+        ? "twse-chain-toggle-btn minimized"
+        : "twse-chain-toggle-btn";
+      this.appendChild(button);
     }
   }
 }
@@ -419,6 +464,9 @@ describe("WarMonitorFeature Sorting Config", () => {
 
     // 2. Set up navigator.clipboard and Torn PDA webview mocks
     const clipboardWriteMock = vi.fn().mockResolvedValue(undefined);
+    if (!global.navigator) {
+      global.navigator = {} as any;
+    }
     Object.defineProperty(global.navigator, "clipboard", {
       value: {
         writeText: clipboardWriteMock,
@@ -617,14 +665,38 @@ describe("WarMonitorFeature Sorting Config", () => {
     global.window.innerHeight = originalInnerHeight;
   });
 
-  it("should toggle minimized state on click and save position on drag", async () => {
+  it("should save position on drag", async () => {
+    const { tornApi } = await import("@utils/api");
     const { twseconfig } = await import("@utils/config");
-    twseconfig.bubble_minimized = false;
+    twseconfig.apiKey = "1234567890123456";
+
+    const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+      ID: 999,
+      name: "Test Faction",
+      tag: "TST",
+      members: {},
+      chain: {
+        current: 42,
+        max: 100,
+        timeout: 120,
+        modifier: 1.5,
+        cooldown: 0,
+        end: Date.now() / 1000 + 120,
+      },
+    });
 
     const factionWarList = new MockElement("div");
     factionWarList.id = "faction_war_list_id";
     const descriptions = new MockElement("div");
     descriptions.className = "descriptions faction-war";
+
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/factions.php?ID=999");
+    ul.appendChild(atag);
+
+    descriptions.appendChild(ul);
     factionWarList.appendChild(descriptions);
     documentMock.body.appendChild(factionWarList);
 
@@ -635,35 +707,16 @@ describe("WarMonitorFeature Sorting Config", () => {
     } as any;
 
     vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 60000);
     WarMonitorFeature.run();
     await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(10000); // Trigger updateStatuses polling interval
+    await vi.advanceTimersByTimeAsync(500); // Trigger watch draw interval
 
     const bubble = documentMock.getElementById("twse-chain-bubble") as any;
     expect(bubble).not.toBeNull();
-    expect(bubble.classList.contains("minimized")).toBe(false);
 
-    // 1. Simulate a simple click (mousedown, mouseup without moving)
-    // Dispatch mousedown
-    bubble.dispatchEvent({
-      type: "mousedown",
-      clientX: 100,
-      clientY: 100,
-      cancelable: true,
-      preventDefault: () => {},
-    });
-
-    // Dispatch mouseup
-    documentMock.dispatchEvent({
-      type: "mouseup",
-      clientX: 100,
-      clientY: 100,
-    });
-
-    // Verify minimized toggled to true
-    expect(bubble.classList.contains("minimized")).toBe(true);
-    expect(twseconfig.bubble_minimized).toBe(true);
-
-    // 2. Simulate dragging (mousedown, mousemove by 10px, mouseup)
+    // Simulate dragging (mousedown, mousemove by 20px, mouseup)
     // Dispatch mousedown
     bubble.dispatchEvent({
       type: "mousedown",
@@ -676,8 +729,8 @@ describe("WarMonitorFeature Sorting Config", () => {
     // Dispatch mousemove
     documentMock.dispatchEvent({
       type: "mousemove",
-      clientX: 110,
-      clientY: 110,
+      clientX: 120,
+      clientY: 120,
       cancelable: true,
       preventDefault: () => {},
     });
@@ -685,16 +738,16 @@ describe("WarMonitorFeature Sorting Config", () => {
     // Dispatch mouseup
     documentMock.dispatchEvent({
       type: "mouseup",
-      clientX: 110,
-      clientY: 110,
+      clientX: 120,
+      clientY: 120,
     });
 
-    // Verify minimized is NOT toggled back (remains true)
-    expect(bubble.classList.contains("minimized")).toBe(true);
+    // Verify position was saved
+    expect(twseconfig.bubble_position).toEqual({ left: 20, top: 20 });
 
     // Clean up
-    twseconfig.bubble_minimized = false;
     vi.useRealTimers();
+    spy.mockRestore();
   });
 
   it("should render cooldown and non-existent chain states correctly", async () => {
