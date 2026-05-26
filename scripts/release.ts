@@ -16,6 +16,12 @@ const EDITIONS = {
     branch: "release",
     tagPrefix: "v",
   },
+  beta: {
+    name: "Torn War Stuff Enhanced Beta",
+    fileName: "torn_war_stuff_enhanced.beta.user.js",
+    branch: "release-beta",
+    tagPrefix: "beta-v",
+  },
 } as const;
 
 type EditionKey = keyof typeof EDITIONS;
@@ -379,6 +385,7 @@ async function main() {
     const buildResult = spawnSync("bun", ["run", "build"], {
       env: {
         ...process.env,
+        BUILD_EDITION: editionKey,
         BUILD_VERSION: version,
       },
       stdio: "inherit",
