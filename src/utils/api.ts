@@ -14,8 +14,12 @@ export class TornApiClient {
   public async fetchFactionData(
     factionId: string,
   ): Promise<FactionResponse | null> {
-    const key = twseconfig.apiKey;
-    if (!key || key === "###PDA-APIKEY###" || key.length !== 16) {
+    const tornpdakey = "###PDA-APIKEY###";
+    let key = twseconfig.apiKey;
+    if (!tornpdakey.startsWith("###PDA")) {
+      key = tornpdakey;
+    }
+    if (!key || key.length !== 16) {
       log.warn("Torn API key is invalid or not set. Skipping API request.");
       return null;
     }
