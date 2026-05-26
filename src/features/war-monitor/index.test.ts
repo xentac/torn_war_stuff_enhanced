@@ -483,6 +483,9 @@ describe("WarMonitorFeature Sorting Config", () => {
       timeout: 120, // 2 minutes remaining relative
       modifier: 1.5,
       cooldown: 0,
+      get end() {
+        return Date.now() / 1000 + this.timeout;
+      },
     };
 
     const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
@@ -733,6 +736,9 @@ describe("WarMonitorFeature Sorting Config", () => {
         timeout: 300,
         modifier: 2.5,
         cooldown: 120, // cooldown active!
+        get end() {
+          return Date.now() / 1000 + this.timeout;
+        },
       },
     };
 
@@ -747,6 +753,9 @@ describe("WarMonitorFeature Sorting Config", () => {
         timeout: 0, // non-existent chain!
         modifier: 1.0,
         cooldown: 0,
+        get end() {
+          return Date.now() / 1000 + this.timeout;
+        },
       },
     };
 

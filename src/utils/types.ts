@@ -25,6 +25,7 @@ export interface FactionChain {
   timeout: number;
   modifier: number;
   cooldown: number;
+  end?: number;
 }
 
 export interface FactionResponse {

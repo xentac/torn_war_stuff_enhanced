@@ -77,6 +77,7 @@ interface ActiveChainState {
   tag: string;
   apiReceivedAt: number;
   cooldown: number;
+  end?: number;
 }
 
 const TRAVELING = "data-twse-traveling";
@@ -525,6 +526,7 @@ const WarMonitorFeature: Feature = {
             tag: data.tag || "",
             apiReceivedAt: getCurrentTimeSec(),
             cooldown: data.chain.cooldown || 0,
+            end: data.chain.end,
           });
         }
       }
@@ -879,7 +881,10 @@ const WarMonitorFeature: Feature = {
         } else {
           // 3. Active running chain countdown
           const elapsed = now - chain.apiReceivedAt;
-          const remaining = chain.timeout - elapsed;
+          const remaining =
+            chain.end && chain.end > 0
+              ? chain.end - now
+              : chain.timeout - elapsed;
           formattedTime = formatChainTimeout(remaining);
 
           if (remaining < 0) {
