@@ -52,3 +52,19 @@ export function formatChainTimeout(seconds: number): string {
   const s = Math.floor(absSeconds % 60);
   return `${isNegative ? "-" : ""}${m}:${pad_with_zeros(s)}`;
 }
+
+/**
+ * Formats seconds left on a chain cooldown cleanly into dynamic compact durations.
+ */
+export function formatChainCooldown(seconds: number): string {
+  if (seconds <= 0) return "0:00";
+  const s = Math.floor(seconds % 60);
+  const m = Math.floor((seconds / 60) % 60);
+  const h = Math.floor((seconds / 3600) % 24);
+  const d = Math.floor(seconds / 86400);
+
+  if (d > 0) return `${d}d${h}h`;
+  if (h > 0) return `${h}h${m}m`;
+  if (m >= 10) return `${m}m`;
+  return `${m}:${pad_with_zeros(s)}`;
+}

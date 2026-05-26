@@ -53,6 +53,17 @@ class MockElement {
       contains: (cls: string) => {
         return this.className.split(" ").includes(cls);
       },
+      toggle: (cls: string) => {
+        if (this.className.split(" ").includes(cls)) {
+          this.className = this.className
+            .split(" ")
+            .filter((c) => c !== cls)
+            .join(" ");
+          return false;
+        }
+        this.className = this.className ? `${this.className} ${cls}` : cls;
+        return true;
+      },
     };
   }
   public style = {
@@ -224,6 +235,7 @@ class MockElement {
   }
 }
 
+const documentListeners = new Map<string, Array<(e: any) => void>>();
 const documentMock = {
   body: new MockElement("body"),
   createElement(tag: string) {
@@ -239,8 +251,30 @@ const documentMock = {
     return this.body.querySelectorAll(sel);
   },
   documentElement: new MockElement("html"),
-  addEventListener: () => {},
-  removeEventListener: () => {},
+  addEventListener: (event: string, callback: (e: any) => void) => {
+    if (!documentListeners.has(event)) {
+      documentListeners.set(event, []);
+    }
+    documentListeners.get(event)!.push(callback);
+  },
+  removeEventListener: (event: string, callback: (e: any) => void) => {
+    const list = documentListeners.get(event);
+    if (list) {
+      documentListeners.set(
+        event,
+        list.filter((cb) => cb !== callback),
+      );
+    }
+  },
+  dispatchEvent: (event: any) => {
+    const list = documentListeners.get(event.type);
+    if (list) {
+      for (const cb of list) {
+        cb(event);
+      }
+    }
+    return true;
+  },
 };
 
 global.document = documentMock as any;
@@ -258,7 +292,10 @@ global.window = {
   removeEventListener: (event: string, callback: (e: any) => void) => {
     const list = windowListeners.get(event);
     if (list) {
-      windowListeners.set(event, list.filter((cb) => cb !== callback));
+      windowListeners.set(
+        event,
+        list.filter((cb) => cb !== callback),
+      );
     }
   },
   dispatchEvent: (event: Event) => {
@@ -271,6 +308,7 @@ global.window = {
     return true;
   },
   getComputedStyle: () => ({ top: "10px" }) as any,
+  getSelection: () => ({ removeAllRanges: () => {} }),
 } as any;
 
 // 3. Import dynamic modules
@@ -574,6 +612,195 @@ describe("WarMonitorFeature Sorting Config", () => {
     twseconfig.bubble_position = null;
     global.window.innerWidth = originalInnerWidth;
     global.window.innerHeight = originalInnerHeight;
+  });
+
+  it("should toggle minimized state on click and save position on drag", async () => {
+    const { twseconfig } = await import("@utils/config");
+    twseconfig.bubble_minimized = false;
+
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    // Mock MutationObserver
+    global.MutationObserver = class {
+      observe = () => {};
+      disconnect = () => {};
+    } as any;
+
+    vi.useFakeTimers();
+    WarMonitorFeature.run();
+    await vi.advanceTimersByTimeAsync(100);
+
+    const bubble = documentMock.getElementById("twse-chain-bubble") as any;
+    expect(bubble).not.toBeNull();
+    expect(bubble.classList.contains("minimized")).toBe(false);
+
+    // 1. Simulate a simple click (mousedown, mouseup without moving)
+    // Dispatch mousedown
+    bubble.dispatchEvent({
+      type: "mousedown",
+      clientX: 100,
+      clientY: 100,
+      cancelable: true,
+      preventDefault: () => {},
+    });
+
+    // Dispatch mouseup
+    documentMock.dispatchEvent({
+      type: "mouseup",
+      clientX: 100,
+      clientY: 100,
+    });
+
+    // Verify minimized toggled to true
+    expect(bubble.classList.contains("minimized")).toBe(true);
+    expect(twseconfig.bubble_minimized).toBe(true);
+
+    // 2. Simulate dragging (mousedown, mousemove by 10px, mouseup)
+    // Dispatch mousedown
+    bubble.dispatchEvent({
+      type: "mousedown",
+      clientX: 100,
+      clientY: 100,
+      cancelable: true,
+      preventDefault: () => {},
+    });
+
+    // Dispatch mousemove
+    documentMock.dispatchEvent({
+      type: "mousemove",
+      clientX: 110,
+      clientY: 110,
+      cancelable: true,
+      preventDefault: () => {},
+    });
+
+    // Dispatch mouseup
+    documentMock.dispatchEvent({
+      type: "mouseup",
+      clientX: 110,
+      clientY: 110,
+    });
+
+    // Verify minimized is NOT toggled back (remains true)
+    expect(bubble.classList.contains("minimized")).toBe(true);
+
+    // Clean up
+    twseconfig.bubble_minimized = false;
+    vi.useRealTimers();
+  });
+
+  it("should render cooldown and non-existent chain states correctly", async () => {
+    const { twseconfig } = await import("@utils/config");
+
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    // Setup members-list so getFactionIds() parses the ID correctly
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/factions.php?ID=1234");
+    ul.appendChild(atag);
+    descriptions.appendChild(ul);
+
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    // Mock MutationObserver
+    global.MutationObserver = class {
+      observe = () => {};
+      disconnect = () => {};
+    } as any;
+
+    const { tornApi } = await import("@utils/api");
+
+    // Mock Faction Data responses
+    const mockData1 = {
+      ID: 1234,
+      name: "Test Faction",
+      tag: "TF",
+      members: {},
+      chain: {
+        current: 50,
+        max: 100,
+        timeout: 300,
+        modifier: 2.5,
+        cooldown: 120, // cooldown active!
+      },
+    };
+
+    const mockData2 = {
+      ID: 1234,
+      name: "Test Faction 2",
+      tag: "TF2",
+      members: {},
+      chain: {
+        current: 0,
+        max: 10,
+        timeout: 0, // non-existent chain!
+        modifier: 1.0,
+        cooldown: 0,
+      },
+    };
+
+    const spy = vi
+      .spyOn(tornApi, "fetchFactionData")
+      .mockResolvedValue(mockData1 as any);
+
+    vi.useFakeTimers();
+    twseconfig.apiKey = "1234567890123456";
+
+    // Setup active war boxes
+    const warBox1 = new MockElement("div");
+    warBox1.className = "faction-warbox";
+    const title1 = new MockElement("div");
+    title1.className = "title";
+    const a1 = new MockElement("a");
+    a1.setAttribute("href", "factions.php?step=profile&ID=1234");
+    title1.appendChild(a1);
+    warBox1.appendChild(title1);
+    documentMock.body.appendChild(warBox1);
+
+    WarMonitorFeature.run();
+
+    // Advance to trigger fetching and updates
+    await vi.advanceTimersByTimeAsync(100);
+
+    const bubble = documentMock.getElementById("twse-chain-bubble") as any;
+    expect(bubble).not.toBeNull();
+
+    // Advance to trigger the 500ms watch interval which calls updateChainBubble()
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Verify cooldown (broken) chain rendering
+    expect(bubble.innerHTML).toContain("twse-chain-count cooldown");
+    expect(bubble.innerHTML).toContain("twse-chain-timer cooldown");
+    // Cooldown is 120 seconds, so it formats to 2:00 or 1:59 depending on exact tick
+    expect(bubble.innerHTML).toMatch(/1:59|2:00/);
+
+    // Now switch mock to non-existent chain
+    spy.mockRestore();
+    const spy2 = vi
+      .spyOn(tornApi, "fetchFactionData")
+      .mockResolvedValue(mockData2 as any);
+
+    // Advance to trigger next poll (10 seconds)
+    await vi.advanceTimersByTimeAsync(10000);
+
+    // Verify inactive/non-existent chain rendering
+    expect(bubble.innerHTML).not.toContain("twse-chain-count cooldown");
+    expect(bubble.innerHTML).not.toContain("twse-chain-timer cooldown");
+    expect(bubble.innerHTML).toContain("okay"); // standard okay class
+    expect(bubble.innerHTML).toContain("-:--");
+
+    spy2.mockRestore();
     vi.useRealTimers();
   });
 });

@@ -6,6 +6,7 @@ enum CONFIG_KEYS {
   DEBUG_LOGS = "debug_logs",
   WAR_SORTING = "war_sorting",
   BUBBLE_POSITION = "bubble_position",
+  BUBBLE_MINIMIZED = "bubble_minimized",
 }
 
 export class Config {
@@ -90,12 +91,24 @@ export class Config {
   }
 
   /**
+   * Gets the stored minimized state of the floating bubble.
+   */
+  get bubble_minimized(): boolean {
+    return this.storage.get<boolean>(CONFIG_KEYS.BUBBLE_MINIMIZED) ?? false;
+  }
+
+  set bubble_minimized(val: boolean) {
+    this.storage.set(CONFIG_KEYS.BUBBLE_MINIMIZED, val);
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
     this.storage.remove(CONFIG_KEYS.DEBUG_LOGS);
     this.storage.remove(CONFIG_KEYS.WAR_SORTING);
     this.storage.remove(CONFIG_KEYS.BUBBLE_POSITION);
+    this.storage.remove(CONFIG_KEYS.BUBBLE_MINIMIZED);
   }
 }
 

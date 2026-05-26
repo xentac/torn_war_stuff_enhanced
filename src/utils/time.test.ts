@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calc_delta,
+  formatChainCooldown,
   formatChainTimeout,
   getCurrentTimeSec,
   pad_with_zeros,
@@ -84,6 +85,35 @@ describe("Time Utilities", () => {
     it("should correctly format negative chain timeouts for polling delays", () => {
       expect(formatChainTimeout(-5)).toBe("-0:05");
       expect(formatChainTimeout(-65)).toBe("-1:05");
+    });
+  });
+
+  describe("formatChainCooldown", () => {
+    it("should format zero and negative cooldowns", () => {
+      expect(formatChainCooldown(0)).toBe("0:00");
+      expect(formatChainCooldown(-10)).toBe("0:00");
+    });
+
+    it("should format short cooldowns (< 10 minutes) with seconds precision", () => {
+      expect(formatChainCooldown(80)).toBe("1:20");
+      expect(formatChainCooldown(599)).toBe("9:59");
+    });
+
+    it("should format medium cooldowns (10 minutes to 1 hour) with minutes precision", () => {
+      expect(formatChainCooldown(600)).toBe("10m");
+      expect(formatChainCooldown(2700)).toBe("45m");
+      expect(formatChainCooldown(3599)).toBe("59m");
+    });
+
+    it("should format long cooldowns (1 hour to 24 hours) as XhYm", () => {
+      expect(formatChainCooldown(3600)).toBe("1h0m");
+      expect(formatChainCooldown(7500)).toBe("2h5m");
+      expect(formatChainCooldown(45000)).toBe("12h30m");
+    });
+
+    it("should format ultra-long cooldowns (>= 24 hours) as XdYh", () => {
+      expect(formatChainCooldown(86400)).toBe("1d0h");
+      expect(formatChainCooldown(273600)).toBe("3d4h");
     });
   });
 });

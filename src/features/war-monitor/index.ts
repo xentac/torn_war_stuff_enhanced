@@ -3,7 +3,12 @@ import { factionCache } from "@utils/cache";
 import { twseconfig } from "@utils/config";
 import { observeElement, waitForElement } from "@utils/dom";
 import logger from "@utils/logger";
-import { calc_delta, formatChainTimeout, getCurrentTimeSec } from "@utils/time";
+import {
+  calc_delta,
+  formatChainCooldown,
+  formatChainTimeout,
+  getCurrentTimeSec,
+} from "@utils/time";
 import {
   extract_destinations_from_description,
   shorten_destination,
@@ -71,6 +76,7 @@ interface ActiveChainState {
   modifier: number;
   tag: string;
   apiReceivedAt: number;
+  cooldown: number;
 }
 
 const TRAVELING = "data-twse-traveling";
@@ -169,7 +175,13 @@ const WarMonitorFeature: Feature = {
         setTimeout(clampToScreen, 0);
       }
 
+      // 2. Recover saved minimized state if exists
+      if (twseconfig.bubble_minimized) {
+        bubbleContainer.classList.add("minimized");
+      }
+
       let isDragging = false;
+      let wasDragged = false;
       let startX = 0;
       let startY = 0;
       let initialX = 0;
@@ -177,6 +189,7 @@ const WarMonitorFeature: Feature = {
 
       const dragStart = (e: MouseEvent | TouchEvent) => {
         isDragging = true;
+        wasDragged = false;
         const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
         const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
 
@@ -217,6 +230,10 @@ const WarMonitorFeature: Feature = {
         const dx = clientX - startX;
         const dy = clientY - startY;
 
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          wasDragged = true;
+        }
+
         const rect = getBubbleRect();
         const w = rect.width;
         const h = rect.height;
@@ -240,9 +257,15 @@ const WarMonitorFeature: Feature = {
         isDragging = false;
         if (bubbleContainer) {
           bubbleContainer.style.cursor = "grab";
-          const left = parseFloat(bubbleContainer.style.left) || 0;
-          const top = parseFloat(bubbleContainer.style.top) || 0;
-          twseconfig.bubble_position = { left, top };
+
+          if (!wasDragged) {
+            const isMin = bubbleContainer.classList.toggle("minimized");
+            twseconfig.bubble_minimized = isMin;
+          } else {
+            const left = parseFloat(bubbleContainer.style.left) || 0;
+            const top = parseFloat(bubbleContainer.style.top) || 0;
+            twseconfig.bubble_position = { left, top };
+          }
         }
 
         document.removeEventListener("mousemove", dragMove);
@@ -501,6 +524,7 @@ const WarMonitorFeature: Feature = {
             modifier: data.chain.modifier,
             tag: data.tag || "",
             apiReceivedAt: getCurrentTimeSec(),
+            cooldown: data.chain.cooldown || 0,
           });
         }
       }
@@ -837,22 +861,39 @@ const WarMonitorFeature: Feature = {
       const now = getCurrentTimeSec();
 
       activeChains.forEach((chain) => {
-        const elapsed = now - chain.apiReceivedAt;
-        const remaining = chain.timeout - elapsed;
-        const formattedTime = formatChainTimeout(remaining);
-
+        let formattedTime = "";
         let timerClass = "okay";
-        if (remaining < 0) {
-          timerClass = "negative";
-        } else if (remaining < 60) {
-          timerClass = "urgent";
+        let countClass = "";
+
+        if (chain.cooldown > 0) {
+          // 1. Cooldown state (Broken chain)
+          const elapsed = now - chain.apiReceivedAt;
+          const remainingCooldown = Math.max(0, chain.cooldown - elapsed);
+          formattedTime = formatChainCooldown(remainingCooldown);
+          timerClass = "cooldown";
+          countClass = "cooldown";
+        } else if (chain.timeout === 0) {
+          // 2. Non-existent/not running chain state
+          formattedTime = "-:--";
+          timerClass = "okay"; // Default standard okay color
+        } else {
+          // 3. Active running chain countdown
+          const elapsed = now - chain.apiReceivedAt;
+          const remaining = chain.timeout - elapsed;
+          formattedTime = formatChainTimeout(remaining);
+
+          if (remaining < 0) {
+            timerClass = "negative";
+          } else if (remaining < 60) {
+            timerClass = "urgent";
+          }
         }
 
         html += `
           <div class="twse-chain-row">
             <span class="twse-chain-tag">[${chain.tag || "Faction"}]</span>
             <div class="twse-chain-stats">
-              <span class="twse-chain-count">${chain.current}/${chain.max}</span>
+              <span class="twse-chain-count ${countClass}">${chain.current}/${chain.max}</span>
               <span class="twse-chain-mult">${chain.modifier.toFixed(2)}x</span>
               <span class="twse-chain-timer ${timerClass}">${formattedTime}</span>
             </div>

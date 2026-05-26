@@ -134,12 +134,12 @@
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   color: #e0e0e0;
   font-family:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1.5;
   display: flex;
   flex-direction: column;
@@ -158,6 +158,15 @@
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
+}
+
+.twse-chain-bubble.minimized {
+  min-width: unset;
+}
+
+.twse-chain-bubble.minimized .twse-chain-tag,
+.twse-chain-bubble.minimized .twse-chain-mult {
+  display: none;
 }
 
 .twse-chain-row {
@@ -198,6 +207,15 @@
 
 .twse-chain-timer.okay {
   color: #69eb69;
+}
+
+.twse-chain-timer.cooldown {
+  color: #64b5f6;
+  background: rgba(100, 181, 246, 0.15);
+}
+
+.twse-chain-count.cooldown {
+  color: #64b5f6;
 }
 
 .twse-chain-timer.negative {
