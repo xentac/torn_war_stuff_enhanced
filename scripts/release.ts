@@ -20,7 +20,7 @@ const EDITIONS = {
     name: "Torn War Stuff Enhanced Beta",
     fileName: "torn_war_stuff_enhanced.beta.user.js",
     branch: "release-beta",
-    tagPrefix: "beta-v",
+    tagPrefix: "v",
   },
 } as const;
 
@@ -44,35 +44,89 @@ function runCmd(
   return result.stdout?.trim();
 }
 
-// Helper to get recent tags for a specific edition branch
-function getRecentTagsForEdition(branch: string, count = 5): string[] {
+// Helper to get recent tags for a specific edition
+function getRecentTagsForEdition(editionKey: EditionKey, count = 5): string[] {
   try {
-    let output = execSync(`git tag --merged ${branch} --sort=-creatordate`, {
+    const output = execSync("git tag --sort=-creatordate", {
       stdio: "pipe",
     })
       .toString()
       .trim();
 
-    if (!output) {
-      output = execSync(
-        `git tag --merged origin/${branch} --sort=-creatordate`,
-        { stdio: "pipe" },
-      )
-        .toString()
-        .trim();
-    }
-
     if (output) {
-      return output
+      const allTags = output
         .split("\n")
         .map((t) => t.trim())
-        .filter(Boolean)
-        .slice(0, count);
+        .filter(Boolean);
+
+      if (editionKey === "beta") {
+        return allTags
+          .filter((t) => {
+            const lower = t.toLowerCase();
+            return (
+              t.includes("-") ||
+              lower.includes("beta") ||
+              lower.includes("alpha") ||
+              lower.includes("rc")
+            );
+          })
+          .slice(0, count);
+      } else {
+        return allTags
+          .filter((t) => {
+            const lower = t.toLowerCase();
+            return (
+              !t.includes("-") &&
+              !lower.includes("beta") &&
+              !lower.includes("alpha") &&
+              !lower.includes("rc")
+            );
+          })
+          .slice(0, count);
+      }
     }
   } catch (_e) {
     // Ignore error
   }
   return [];
+}
+
+function getNextLogicalVersion(version: string): string {
+  // 1. Matches standard prerelease versions like "2.0-beta1", "2.77-xentac1"
+  const prereleaseMatch = version.match(/^(\d+(?:\.\d+)*)-([a-zA-Z]+)(\d+)$/i);
+  if (prereleaseMatch) {
+    const [_, base, type, numStr] = prereleaseMatch;
+    const nextNum = parseInt(numStr, 10) + 1;
+    return `${base}-${type}${nextNum}`;
+  }
+
+  // 2. Matches standard dotted prerelease SemVer like "2.0.0-beta.1", "2.77-xentac.1"
+  const dottedPrereleaseMatch = version.match(
+    /^(\d+(?:\.\d+)*)-([a-zA-Z]+)\.(\d+)$/i,
+  );
+  if (dottedPrereleaseMatch) {
+    const [_, base, type, numStr] = dottedPrereleaseMatch;
+    const nextNum = parseInt(numStr, 10) + 1;
+    return `${base}-${type}.${nextNum}`;
+  }
+
+  // 3. Matches standard dotted versions like "1.17.0"
+  const dottedMatch = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (dottedMatch) {
+    const [_, major, minor, patch] = dottedMatch;
+    const nextPatch = parseInt(patch, 10) + 1;
+    return `${major}.${minor}.${nextPatch}`;
+  }
+
+  // 4. Matches minor dotted versions like "2.0"
+  const minorDottedMatch = version.match(/^(\d+)\.(\d+)$/);
+  if (minorDottedMatch) {
+    const [_, major, minor] = minorDottedMatch;
+    const nextMinor = parseInt(minor, 10) + 1;
+    return `${major}.${nextMinor}`;
+  }
+
+  return version;
 }
 
 // Helper to get release metadata from branch
@@ -111,7 +165,7 @@ async function showEditionStatus(editionKey: EditionKey, sourceCommit: string) {
   console.log(`Branch:          \x1b[36m${edition.branch}\x1b[0m`);
 
   // Recent Tags
-  const recentTags = getRecentTagsForEdition(edition.branch, 5);
+  const recentTags = getRecentTagsForEdition(editionKey, 5);
   console.log("Recent tags:");
   if (recentTags.length > 0) {
     for (const tag of recentTags) {
@@ -304,10 +358,11 @@ async function main() {
     if (!version) {
       // Suggest previous tag
       let suggestion = "1.0.0";
-      const recentTags = getRecentTagsForEdition(edition.branch, 5);
+      const recentTags = getRecentTagsForEdition(editionKey, 5);
       const lastTag = recentTags[0];
       if (lastTag) {
         suggestion = lastTag.startsWith("v") ? lastTag.slice(1) : lastTag;
+        suggestion = getNextLogicalVersion(suggestion);
       } else {
         // Fallback to git describe --tags --abbrev=0 for general suggestion
         try {
@@ -316,6 +371,7 @@ async function main() {
             .trim();
           if (lastTag) {
             suggestion = lastTag.startsWith("v") ? lastTag.slice(1) : lastTag;
+            suggestion = getNextLogicalVersion(suggestion);
           }
         } catch (_e) {
           // No tags yet
@@ -326,11 +382,7 @@ async function main() {
       version = await rl.question(
         `Enter release version (suggested: ${suggestion}): `,
       );
-      version = version.trim();
-      if (!version) {
-        console.error("Version is required.");
-        process.exit(1);
-      }
+      version = version.trim() || suggestion;
     }
 
     // 5. Confirm Release Action
@@ -499,23 +551,15 @@ async function main() {
       );
     }
 
-    // 9. Tag the Commit
-    console.log(`Tagging release as ${tagName}...`);
+    // 9. Tag the Source Commit
+    console.log(`Tagging source commit as ${tagName}...`);
     // Delete tag if it already exists locally to allow re-tagging (common in fix-ups)
     try {
       execSync(`git tag -d ${tagName}`, { stdio: "ignore" });
     } catch {
       // Tag didn't exist
     }
-    runCmd("git", [
-      "-C",
-      worktreeDir,
-      "tag",
-      "-a",
-      tagName,
-      "-m",
-      commitMessage,
-    ]);
+    runCmd("git", ["tag", "-a", tagName, sourceCommit, "-m", commitMessage]);
 
     // 10. Clean up worktree
     console.log("Cleaning up worktree...");
