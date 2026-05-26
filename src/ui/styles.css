@@ -75,7 +75,7 @@
   height: 13px;
 }
 
-.members-list li [class*="member"] {
+.members-list li.member {
   position: relative !important;
   display: flex !important;
   align-items: center;
