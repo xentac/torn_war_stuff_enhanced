@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { calc_delta, getCurrentTimeSec, pad_with_zeros } from "./time";
+import {
+  calc_delta,
+  formatChainTimeout,
+  getCurrentTimeSec,
+  pad_with_zeros,
+} from "./time";
 
 describe("Time Utilities", () => {
   describe("pad_with_zeros", () => {
@@ -62,6 +67,23 @@ describe("Time Utilities", () => {
       expect(getCurrentTimeSec()).toBe(1700000000);
 
       global.window = originalWindow;
+    });
+  });
+
+  describe("formatChainTimeout", () => {
+    it("should correctly format positive chain timeouts", () => {
+      expect(formatChainTimeout(272)).toBe("4:32");
+      expect(formatChainTimeout(60)).toBe("1:00");
+      expect(formatChainTimeout(5)).toBe("0:05");
+    });
+
+    it("should correctly format zero chain timeout", () => {
+      expect(formatChainTimeout(0)).toBe("0:00");
+    });
+
+    it("should correctly format negative chain timeouts for polling delays", () => {
+      expect(formatChainTimeout(-5)).toBe("-0:05");
+      expect(formatChainTimeout(-65)).toBe("-1:05");
     });
   });
 });

@@ -129,10 +129,13 @@ class MockElement {
       return this.findRecursive((el) => el.className.includes("graphIcon"));
     }
     if (selector.startsWith("a[href")) {
+      const match = selector.includes("factions.php")
+        ? "/factions.php"
+        : "/profiles.php";
       return this.findRecursive(
         (el) =>
           el.tagName === "A" &&
-          (el.getAttribute("href")?.includes("/profiles.php") ?? false),
+          (el.getAttribute("href")?.includes(match) ?? false),
       );
     }
     return this.findRecursive((el) => el.tagName === selector.toUpperCase());
@@ -205,7 +208,12 @@ class MockElement {
     return true;
   }
 
+  private _innerHTML = "";
+  get innerHTML() {
+    return this._innerHTML;
+  }
   set innerHTML(html: string) {
+    this._innerHTML = html;
     // Basic parser for our specific template injection
     if (html.includes("twse-war-sort-checkbox")) {
       const checkbox = new MockElement("input");
@@ -236,9 +244,32 @@ const documentMock = {
 };
 
 global.document = documentMock as any;
+const windowListeners = new Map<string, Array<(e: any) => void>>();
 global.window = {
-  dispatchEvent: () => true,
-  addEventListener: () => {},
+  location: { href: "factions.php" },
+  innerWidth: 800,
+  innerHeight: 600,
+  addEventListener: (event: string, callback: (e: any) => void) => {
+    if (!windowListeners.has(event)) {
+      windowListeners.set(event, []);
+    }
+    windowListeners.get(event)!.push(callback);
+  },
+  removeEventListener: (event: string, callback: (e: any) => void) => {
+    const list = windowListeners.get(event);
+    if (list) {
+      windowListeners.set(event, list.filter((cb) => cb !== callback));
+    }
+  },
+  dispatchEvent: (event: Event) => {
+    const list = windowListeners.get(event.type);
+    if (list) {
+      for (const cb of list) {
+        cb(event);
+      }
+    }
+    return true;
+  },
   getComputedStyle: () => ({ top: "10px" }) as any,
 } as any;
 
@@ -400,5 +431,149 @@ describe("WarMonitorFeature Sorting Config", () => {
       expect(clipboardWriteMock).toHaveBeenCalledWith("Astrobelt [12345]");
       expect(copyBtn.className).toContain("success");
     }
+  });
+
+  it("should create floating bubble and update chain status when active chains are fetched", async () => {
+    const { tornApi } = await import("@utils/api");
+    const { twseconfig } = await import("@utils/config");
+
+    twseconfig.apiKey = "1234567890123456"; // 16 chars
+
+    const mockChainData = {
+      current: 42,
+      max: 100,
+      timeout: 120, // 2 minutes remaining relative
+      modifier: 1.5,
+      cooldown: 0,
+    };
+
+    const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+      ID: 999,
+      name: "Test Faction",
+      tag: "TST",
+      members: {},
+      chain: mockChainData,
+    });
+
+    // 1. Setup mock faction war DOM layout
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/factions.php?ID=999");
+    ul.appendChild(atag);
+
+    descriptions.appendChild(ul);
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    // Mock MutationObserver
+    const observeMock = vi.fn();
+    const disconnectMock = vi.fn();
+    global.MutationObserver = class {
+      observe = observeMock;
+      disconnect = disconnectMock;
+    } as any;
+
+    vi.useFakeTimers();
+
+    // 2. Run feature
+    WarMonitorFeature.run();
+
+    // Advance to trigger initial updates
+    await vi.advanceTimersByTimeAsync(100);
+
+    const bubble = documentMock.getElementById("twse-chain-bubble") as any;
+    expect(bubble).not.toBeNull();
+
+    // Advance to trigger the 500ms watch tick
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(spy).toHaveBeenCalledWith("999");
+    expect(bubble.innerHTML).toContain("[TST]");
+    expect(bubble.innerHTML).toContain("42/100");
+    expect(bubble.innerHTML).toContain("1.50x");
+    expect(bubble.innerHTML).toMatch(/1:59|2:00/);
+    expect(bubble.className).not.toContain("hidden");
+
+    // Test negative countdown scenario (expired chain before next poll)
+    mockChainData.timeout = 2;
+    await vi.advanceTimersByTimeAsync(10000); // trigger poll with timeout: 2
+
+    // Now advance 7 seconds so the countdown goes below zero client-side before the next poll
+    await vi.advanceTimersByTimeAsync(7000);
+
+    expect(bubble.innerHTML).toMatch(/-0:04|-0:05/);
+
+    vi.useRealTimers();
+    spy.mockRestore();
+  });
+
+  it("should persist and recover bubble position and clamp to viewport limits on resize", async () => {
+    const { twseconfig } = await import("@utils/config");
+
+    // 1. Setup mock configs
+    twseconfig.bubble_position = { left: 400, top: 300 };
+
+    // Setup viewport globals
+    const originalInnerWidth = global.window.innerWidth;
+    const originalInnerHeight = global.window.innerHeight;
+    global.window.innerWidth = 800;
+    global.window.innerHeight = 600;
+
+    // Setup mock faction war DOM layout
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    // Mock MutationObserver
+    const observeMock = vi.fn();
+    const disconnectMock = vi.fn();
+    global.MutationObserver = class {
+      observe = observeMock;
+      disconnect = disconnectMock;
+    } as any;
+
+    vi.useFakeTimers();
+
+    // 2. Run feature
+    WarMonitorFeature.run();
+
+    // Advance to trigger initial updates
+    await vi.advanceTimersByTimeAsync(100);
+
+    const bubble = documentMock.getElementById("twse-chain-bubble") as any;
+    expect(bubble).not.toBeNull();
+
+    // Verify recovery of position
+    expect(bubble.style.left).toBe("400px");
+    expect(bubble.style.top).toBe("300px");
+
+    // Simulate window resize to a smaller size (e.g. 300x200) where the position (400, 300) would be offscreen
+    global.window.innerWidth = 300;
+    global.window.innerHeight = 200;
+
+    // Trigger window resize event
+    global.window.dispatchEvent(new Event("resize"));
+
+    // The clamping should bring it within viewport (max left = 300 - 170 = 130px, max top = 200 - 60 = 140px)
+    expect(parseFloat(bubble.style.left)).toBeLessThanOrEqual(130);
+    expect(parseFloat(bubble.style.top)).toBeLessThanOrEqual(140);
+
+    // Clean up
+    twseconfig.bubble_position = null;
+    global.window.innerWidth = originalInnerWidth;
+    global.window.innerHeight = originalInnerHeight;
+    vi.useRealTimers();
   });
 });

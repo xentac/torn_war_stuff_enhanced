@@ -5,6 +5,7 @@ enum CONFIG_KEYS {
   API_KEY = "apikey",
   DEBUG_LOGS = "debug_logs",
   WAR_SORTING = "war_sorting",
+  BUBBLE_POSITION = "bubble_position",
 }
 
 export class Config {
@@ -70,11 +71,31 @@ export class Config {
   }
 
   /**
+   * Gets the stored draggable position of the floating bubble.
+   */
+  get bubble_position(): { left: number; top: number } | null {
+    return (
+      this.storage.get<{ left: number; top: number }>(
+        CONFIG_KEYS.BUBBLE_POSITION,
+      ) ?? null
+    );
+  }
+
+  set bubble_position(val: { left: number; top: number } | null) {
+    if (val === null) {
+      this.storage.remove(CONFIG_KEYS.BUBBLE_POSITION);
+    } else {
+      this.storage.set(CONFIG_KEYS.BUBBLE_POSITION, val);
+    }
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
     this.storage.remove(CONFIG_KEYS.DEBUG_LOGS);
     this.storage.remove(CONFIG_KEYS.WAR_SORTING);
+    this.storage.remove(CONFIG_KEYS.BUBBLE_POSITION);
   }
 }
 

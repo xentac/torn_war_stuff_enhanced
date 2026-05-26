@@ -41,3 +41,14 @@ export function calc_delta(
 
   return hour_minute + (include_seconds ? `:${pad_with_zeros(s)}` : "");
 }
+
+/**
+ * Formats seconds left on a chain cleanly as [-]M:SS, allowing negative count down.
+ */
+export function formatChainTimeout(seconds: number): string {
+  const isNegative = seconds < 0;
+  const absSeconds = Math.abs(seconds);
+  const m = Math.floor(absSeconds / 60);
+  const s = Math.floor(absSeconds % 60);
+  return `${isNegative ? "-" : ""}${m}:${pad_with_zeros(s)}`;
+}

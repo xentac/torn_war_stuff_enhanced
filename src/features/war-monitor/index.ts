@@ -3,7 +3,7 @@ import { factionCache } from "@utils/cache";
 import { twseconfig } from "@utils/config";
 import { observeElement, waitForElement } from "@utils/dom";
 import logger from "@utils/logger";
-import { calc_delta, getCurrentTimeSec } from "@utils/time";
+import { calc_delta, formatChainTimeout, getCurrentTimeSec } from "@utils/time";
 import {
   extract_destinations_from_description,
   shorten_destination,
@@ -64,6 +64,15 @@ interface MemberLiRef {
   statusDiv: HTMLDivElement | null;
 }
 
+interface ActiveChainState {
+  current: number;
+  max: number;
+  timeout: number;
+  modifier: number;
+  tag: string;
+  apiReceivedAt: number;
+}
+
 const TRAVELING = "data-twse-traveling";
 const HIGHLIGHT = "data-twse-highlight";
 const STATUS_DIFFERS = "data-twse-status-differs";
@@ -95,6 +104,158 @@ const WarMonitorFeature: Feature = {
 
     let lastRequestTime = 0;
     const minTimeBetweenRequestsMs = 10_000;
+
+    const activeChains = new Map<string, ActiveChainState>();
+
+    let bubbleContainer = document.getElementById(
+      "twse-chain-bubble",
+    ) as HTMLDivElement | null;
+    if (!bubbleContainer) {
+      bubbleContainer = document.createElement("div");
+      bubbleContainer.id = "twse-chain-bubble";
+      bubbleContainer.className = "twse-chain-bubble hidden";
+      document.body.appendChild(bubbleContainer);
+    }
+
+    const getBubbleRect = (): {
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    } => {
+      if (
+        bubbleContainer &&
+        typeof bubbleContainer.getBoundingClientRect === "function"
+      ) {
+        const r = bubbleContainer.getBoundingClientRect();
+        return {
+          left: r.left ?? 0,
+          top: r.top ?? 0,
+          width: r.width || 170,
+          height: r.height || 60,
+        };
+      }
+      return { left: 0, top: 0, width: 170, height: 60 };
+    };
+
+    const clampToScreen = () => {
+      if (!bubbleContainer) return;
+      const rect = getBubbleRect();
+      const w = rect.width;
+      const h = rect.height;
+
+      const currentLeft = parseFloat(bubbleContainer.style.left);
+      const currentTop = parseFloat(bubbleContainer.style.top);
+
+      if (!Number.isNaN(currentLeft) && !Number.isNaN(currentTop)) {
+        const maxLeft = window.innerWidth - w;
+        const maxTop = window.innerHeight - h;
+        bubbleContainer.style.left = `${Math.max(0, Math.min(currentLeft, maxLeft))}px`;
+        bubbleContainer.style.top = `${Math.max(0, Math.min(currentTop, maxTop))}px`;
+      }
+    };
+
+    window.addEventListener("resize", clampToScreen, { passive: true });
+
+    // Draggable floating bubble implementation (Mouse & Touch compatible)
+    if (bubbleContainer) {
+      // 1. Recover saved position if exists
+      const savedPos = twseconfig.bubble_position;
+      if (savedPos) {
+        bubbleContainer.style.bottom = "auto";
+        bubbleContainer.style.right = "auto";
+        bubbleContainer.style.left = `${savedPos.left}px`;
+        bubbleContainer.style.top = `${savedPos.top}px`;
+        setTimeout(clampToScreen, 0);
+      }
+
+      let isDragging = false;
+      let startX = 0;
+      let startY = 0;
+      let initialX = 0;
+      let initialY = 0;
+
+      const dragStart = (e: MouseEvent | TouchEvent) => {
+        isDragging = true;
+        const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+        const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
+        startX = clientX;
+        startY = clientY;
+
+        if (bubbleContainer) {
+          const rect = getBubbleRect();
+          initialX = rect.left;
+          initialY = rect.top;
+
+          bubbleContainer.style.transition = "none";
+          bubbleContainer.style.cursor = "grabbing";
+        }
+
+        // Prevent surrounding text selection and clear active selections
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        window.getSelection()?.removeAllRanges();
+
+        document.addEventListener("mousemove", dragMove);
+        document.addEventListener("touchmove", dragMove, { passive: false });
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("touchend", dragEnd);
+      };
+
+      const dragMove = (e: MouseEvent | TouchEvent) => {
+        if (!isDragging || !bubbleContainer) return;
+
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+
+        const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+        const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+
+        const rect = getBubbleRect();
+        const w = rect.width;
+        const h = rect.height;
+
+        let newLeft = initialX + dx;
+        let newTop = initialY + dy;
+
+        const maxLeft = window.innerWidth - w;
+        const maxTop = window.innerHeight - h;
+
+        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+        newTop = Math.max(0, Math.min(newTop, maxTop));
+
+        bubbleContainer.style.bottom = "auto";
+        bubbleContainer.style.right = "auto";
+        bubbleContainer.style.left = `${newLeft}px`;
+        bubbleContainer.style.top = `${newTop}px`;
+      };
+
+      const dragEnd = () => {
+        isDragging = false;
+        if (bubbleContainer) {
+          bubbleContainer.style.cursor = "grab";
+          const left = parseFloat(bubbleContainer.style.left) || 0;
+          const top = parseFloat(bubbleContainer.style.top) || 0;
+          twseconfig.bubble_position = { left, top };
+        }
+
+        document.removeEventListener("mousemove", dragMove);
+        document.removeEventListener("touchmove", dragMove);
+        document.removeEventListener("mouseup", dragEnd);
+        document.removeEventListener("touchend", dragEnd);
+      };
+
+      bubbleContainer.addEventListener("mousedown", dragStart);
+      bubbleContainer.addEventListener("touchstart", dragStart, {
+        passive: false,
+      });
+    }
 
     // Listen for visibility updates
     document.addEventListener("visibilitychange", () => {
@@ -331,6 +492,17 @@ const WarMonitorFeature: Feature = {
         }
 
         factionCache.set(factionId, factionStatus);
+
+        if (data.chain) {
+          activeChains.set(factionId, {
+            current: data.chain.current,
+            max: data.chain.max,
+            timeout: data.chain.timeout,
+            modifier: data.chain.modifier,
+            tag: data.tag || "",
+            apiReceivedAt: getCurrentTimeSec(),
+          });
+        }
       }
     }
 
@@ -649,6 +821,47 @@ const WarMonitorFeature: Feature = {
           memberLis.delete(id);
         }
       }
+
+      updateChainBubble();
+    }
+
+    function updateChainBubble() {
+      if (!bubbleContainer) return;
+
+      if (!foundWar || activeChains.size === 0) {
+        bubbleContainer.classList.add("hidden");
+        return;
+      }
+
+      let html = "";
+      const now = getCurrentTimeSec();
+
+      activeChains.forEach((chain) => {
+        const elapsed = now - chain.apiReceivedAt;
+        const remaining = chain.timeout - elapsed;
+        const formattedTime = formatChainTimeout(remaining);
+
+        let timerClass = "okay";
+        if (remaining < 0) {
+          timerClass = "negative";
+        } else if (remaining < 60) {
+          timerClass = "urgent";
+        }
+
+        html += `
+          <div class="twse-chain-row">
+            <span class="twse-chain-tag">[${chain.tag || "Faction"}]</span>
+            <div class="twse-chain-stats">
+              <span class="twse-chain-count">${chain.current}/${chain.max}</span>
+              <span class="twse-chain-mult">${chain.modifier.toFixed(2)}x</span>
+              <span class="twse-chain-timer ${timerClass}">${formattedTime}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      bubbleContainer.innerHTML = html;
+      bubbleContainer.classList.remove("hidden");
     }
 
     const initWarMonitoring = (descriptions: Element) => {
