@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta2
+// @version      2.0-beta3
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -594,7 +594,7 @@ cleanExpired() {
       to: shorten_destination(match[2])
     };
   }
-  const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}.members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status{position:relative!important;color:transparent!important}.members-list div.status:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li [class*=member]{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:9999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px 12px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;gap:8px;transition:opacity .3s ease,transform .3s ease;min-width:170px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-bubble.minimized{min-width:unset}.twse-chain-bubble.minimized .twse-chain-tag,.twse-chain-bubble.minimized .twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-tag{font-weight:700;color:#ffb74d}.twse-chain-stats{display:flex;align-items:center;gap:6px}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-mult{color:#aaa;font-size:11px}.twse-chain-timer{font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ffb74d;background:#ffb74d26}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}";
+  const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}.members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status{position:relative!important;color:transparent!important}.members-list div.status:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li [class*=member]{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:9999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}";
   importCSS(stylesCss);
   const log$1 = logger.child("feature:war-monitor");
   async function copyToClipboard(text) {
@@ -665,6 +665,9 @@ cleanExpired() {
         bubbleContainer.className = "twse-chain-bubble hidden";
         document.body.appendChild(bubbleContainer);
       }
+      if (bubbleContainer && !bubbleContainer.querySelector(".twse-chain-body")) {
+        bubbleContainer.innerHTML = `<div class="twse-chain-body"></div>`;
+      }
       const getBubbleRect = () => {
         if (bubbleContainer && typeof bubbleContainer.getBoundingClientRect === "function") {
           const r = bubbleContainer.getBoundingClientRect();
@@ -701,20 +704,18 @@ cleanExpired() {
           bubbleContainer.style.top = `${savedPos.top}px`;
           setTimeout(clampToScreen, 0);
         }
-        if (twseconfig.bubble_minimized) {
-          bubbleContainer.classList.add("minimized");
-        }
         let isDragging = false;
-        let wasDragged = false;
         let startX = 0;
         let startY = 0;
         let initialX = 0;
         let initialY = 0;
         const dragStart = (e) => {
           isDragging = true;
-          wasDragged = false;
-          const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-          const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+          const isTouch = e.type === "touchstart";
+          const touchEvent = e;
+          const mouseEvent = e;
+          const clientX = isTouch && touchEvent.touches && touchEvent.touches.length > 0 ? touchEvent.touches[0].clientX : mouseEvent.clientX;
+          const clientY = isTouch && touchEvent.touches && touchEvent.touches.length > 0 ? touchEvent.touches[0].clientY : mouseEvent.clientY;
           startX = clientX;
           startY = clientY;
           if (bubbleContainer) {
@@ -724,7 +725,7 @@ cleanExpired() {
             bubbleContainer.style.transition = "none";
             bubbleContainer.style.cursor = "grabbing";
           }
-          if (e.cancelable) {
+          if (!isTouch && e.cancelable) {
             e.preventDefault();
           }
           window.getSelection()?.removeAllRanges();
@@ -738,13 +739,13 @@ cleanExpired() {
           if (e.cancelable) {
             e.preventDefault();
           }
-          const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-          const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+          const isTouch = e.type === "touchmove";
+          const touchEvent = e;
+          const mouseEvent = e;
+          const clientX = isTouch && touchEvent.touches && touchEvent.touches.length > 0 ? touchEvent.touches[0].clientX : mouseEvent.clientX;
+          const clientY = isTouch && touchEvent.touches && touchEvent.touches.length > 0 ? touchEvent.touches[0].clientY : mouseEvent.clientY;
           const dx = clientX - startX;
           const dy = clientY - startY;
-          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-            wasDragged = true;
-          }
           const rect = getBubbleRect();
           const w = rect.width;
           const h = rect.height;
@@ -763,14 +764,9 @@ cleanExpired() {
           isDragging = false;
           if (bubbleContainer) {
             bubbleContainer.style.cursor = "grab";
-            if (!wasDragged) {
-              const isMin = bubbleContainer.classList.toggle("minimized");
-              twseconfig.bubble_minimized = isMin;
-            } else {
-              const left = parseFloat(bubbleContainer.style.left) || 0;
-              const top = parseFloat(bubbleContainer.style.top) || 0;
-              twseconfig.bubble_position = { left, top };
-            }
+            const left = parseFloat(bubbleContainer.style.left) || 0;
+            const top = parseFloat(bubbleContainer.style.top) || 0;
+            twseconfig.bubble_position = { left, top };
           }
           document.removeEventListener("mousemove", dragMove);
           document.removeEventListener("touchmove", dragMove);
@@ -1254,6 +1250,8 @@ cleanExpired() {
           bubbleContainer.classList.add("hidden");
           return;
         }
+        const bodyContainer = bubbleContainer.querySelector(".twse-chain-body");
+        if (!bodyContainer) return;
         let html = "";
         const now = getCurrentTimeSec();
         activeChains.forEach((chain) => {
@@ -1290,7 +1288,7 @@ cleanExpired() {
           </div>
         `;
         });
-        bubbleContainer.innerHTML = html;
+        bodyContainer.innerHTML = html;
         bubbleContainer.classList.remove("hidden");
       }
       const initWarMonitoring = (descriptions) => {
