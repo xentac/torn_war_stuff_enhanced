@@ -1,9 +1,11 @@
 .members-list li:has(div.status[data-twse-highlight="true"]) {
   background-color: #99eb99 !important;
 }
+
 .members-list li:has(div.status[data-twse-status-differs="true"]) {
   background-color: #c4974c !important;
 }
+
 .members-list div.status[data-twse-traveling="true"]::after {
   color: #696026 !important;
 }
@@ -11,12 +13,14 @@
 :root .dark-mode .members-list li:has(div.status[data-twse-highlight="true"]) {
   background-color: #446944 !important;
 }
+
 :root
   .dark-mode
   .members-list
   li:has(div.status[data-twse-status-differs="true"]) {
   background-color: #795315 !important;
 }
+
 :root .dark-mode .members-list div.status[data-twse-traveling="true"]::after {
   color: #ffed76 !important;
 }
@@ -25,6 +29,7 @@
   position: relative !important;
   color: transparent !important;
 }
+
 .members-list div.status::after {
   content: var(--twse-content);
   position: absolute;
@@ -37,7 +42,9 @@
   right: 10px;
   justify-content: flex-end;
   align-items: center;
+  white-space: nowrap !important;
 }
+
 .members-list .ok.status::after {
   color: var(--user-status-green-color);
 }
@@ -226,6 +233,7 @@
   from {
     box-shadow: 0 0 2px rgba(255, 82, 82, 0.4);
   }
+
   to {
     box-shadow: 0 0 8px rgba(255, 82, 82, 0.8);
   }
