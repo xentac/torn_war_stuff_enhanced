@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta7
+// @version      2.0-beta8
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1470,7 +1470,7 @@ clearAll() {
       return false;
     }
     const hash = window.location.hash || "";
-    if (hash.startsWith("#/tab=")) {
+    if (!hash.startsWith("#/war/")) {
       return false;
     }
     return true;
@@ -2325,7 +2325,11 @@ clearAll() {
       };
       const handleNavigation = () => {
         const shouldRun = shouldRunMonitor();
-        if (shouldRun && !active) {
+        if (shouldRun) {
+          if (stopMonitor) {
+            stopMonitor();
+            stopMonitor = null;
+          }
           startMonitor();
         } else if (!shouldRun && active) {
           if (stopMonitor) {
