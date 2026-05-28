@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // 1. Setup localStorage polyfill for vitest
 const storageMock: Record<string, string> = {};
@@ -85,6 +85,16 @@ class MockElement {
 
   constructor(tagName: string) {
     this.tagName = tagName.toUpperCase();
+  }
+
+  remove() {
+    if (this.parentNode) {
+      const idx = this.parentNode.children.indexOf(this);
+      if (idx !== -1) {
+        this.parentNode.children.splice(idx, 1);
+      }
+      this.parentNode = null;
+    }
   }
 
   get childNodes() {
@@ -370,6 +380,19 @@ describe("WarMonitorFeature Sorting Config", () => {
     localStorage.clear();
     documentMock.body = new MockElement("body");
     twseconfig.war_sorting = true;
+    // Reset window.location
+    global.window.location.href = "factions.php";
+    global.window.location.hash = "";
+  });
+
+  afterEach(async () => {
+    // Restore real timers first to ensure setTimeout/promises in afterEach can resolve
+    vi.useRealTimers();
+    // Navigate away to trigger stopMonitor() and clean up all intervals, observers, and listeners
+    global.window.location.hash = "#/tab=controls";
+    global.window.dispatchEvent(new Event("popstate"));
+    // Wait for the setTimeout(..., 0) inside on_navigation to execute
+    await new Promise((resolve) => setTimeout(resolve, 10));
   });
 
   it("should have war_sorting enabled by default", () => {
@@ -925,6 +948,147 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       expect(clearSpy).toHaveBeenCalled();
       clearSpy.mockRestore();
+    });
+  });
+
+  describe("Navigation Handling Lifecycle", () => {
+    beforeEach(() => {
+      localStorage.clear();
+      documentMock.body = new MockElement("body");
+      // Reset window.location
+      global.window.location.href = "https://www.torn.com/factions.php";
+      global.window.location.hash = "";
+    });
+
+    it("should start monitor if shouldRunMonitor() matches initially", async () => {
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+      documentMock.body.appendChild(factionWarList);
+
+      WarMonitorFeature.run();
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const bubble = documentMock.getElementById("twse-chain-bubble");
+      expect(bubble).not.toBeNull();
+    });
+
+    it("should clean up and remove bubble/checkbox when navigating away", async () => {
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+
+      const descriptions = new MockElement("div");
+      descriptions.className = "descriptions";
+      const graphIcon = new MockElement("div");
+      graphIcon.className = "right c-pointer graphIcon___aoXDs";
+      descriptions.appendChild(graphIcon);
+      factionWarList.appendChild(descriptions);
+      documentMock.body.appendChild(factionWarList);
+
+      WarMonitorFeature.run();
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Bubble and sorting checkbox should be created
+      expect(documentMock.getElementById("twse-chain-bubble")).not.toBeNull();
+      expect(
+        documentMock.getElementById("twse-war-sort-checkbox"),
+      ).not.toBeNull();
+
+      // Now, simulate navigating away to factions.php#/tab=controls
+      global.window.location.hash = "#/tab=controls";
+
+      // Dispatch popstate/hashchange to trigger on_navigation
+      global.window.dispatchEvent(new Event("popstate"));
+      global.window.dispatchEvent(new Event("hashchange"));
+
+      // Advance timers or delay to let setTimeout(..., 0) run
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Bubble and sorting checkbox should be removed from DOM
+      expect(documentMock.getElementById("twse-chain-bubble")).toBeNull();
+      expect(documentMock.getElementById("twse-war-sort-checkbox")).toBeNull();
+    });
+
+    it("should restart monitor when navigating back to valid hash", async () => {
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+
+      const descriptions = new MockElement("div");
+      descriptions.className = "descriptions";
+      const graphIcon = new MockElement("div");
+      graphIcon.className = "right c-pointer graphIcon___aoXDs";
+      descriptions.appendChild(graphIcon);
+      factionWarList.appendChild(descriptions);
+      documentMock.body.appendChild(factionWarList);
+
+      WarMonitorFeature.run();
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Navigate away
+      global.window.location.hash = "#/tab=controls";
+      global.window.dispatchEvent(new Event("popstate"));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(documentMock.getElementById("twse-chain-bubble")).toBeNull();
+
+      // Navigate back to factions.php#/
+      global.window.location.hash = "#/";
+      global.window.dispatchEvent(new Event("popstate"));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Bubble and sorting checkbox should be re-created
+      expect(documentMock.getElementById("twse-chain-bubble")).not.toBeNull();
+      expect(
+        documentMock.getElementById("twse-war-sort-checkbox"),
+      ).not.toBeNull();
+    });
+
+    it("should clean up and remove bubble/checkbox when navigating to any tab hashes under #/tab=", async () => {
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+
+      const descriptions = new MockElement("div");
+      descriptions.className = "descriptions";
+      const graphIcon = new MockElement("div");
+      graphIcon.className = "right c-pointer graphIcon___aoXDs";
+      descriptions.appendChild(graphIcon);
+      factionWarList.appendChild(descriptions);
+      documentMock.body.appendChild(factionWarList);
+
+      const newlyExcludedHashes = [
+        "#/tab=territory",
+        "#/tab=info",
+        "#/tab=rank",
+        "#/tab=crimes",
+        "#/tab=upgrades",
+        "#/tab=armoury",
+        "#/tab=controls",
+      ];
+
+      for (const targetHash of newlyExcludedHashes) {
+        // Reset and start monitor
+        global.window.location.hash = "";
+        WarMonitorFeature.run();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(documentMock.getElementById("twse-chain-bubble")).not.toBeNull();
+        expect(
+          documentMock.getElementById("twse-war-sort-checkbox"),
+        ).not.toBeNull();
+
+        // Simulate navigating to the excluded tab hash
+        global.window.location.hash = targetHash;
+        global.window.dispatchEvent(new Event("popstate"));
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // State should be completely torn down
+        expect(documentMock.getElementById("twse-chain-bubble")).toBeNull();
+        expect(
+          documentMock.getElementById("twse-war-sort-checkbox"),
+        ).toBeNull();
+      }
     });
   });
 });

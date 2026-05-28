@@ -97,3 +97,85 @@ export function injectStyles(css: string, id?: string): HTMLStyleElement {
   (document.head || document.documentElement).appendChild(style);
   return style;
 }
+
+export type TornPageParams = {
+  sid?: string;
+  step?: string;
+  page?: string;
+};
+
+/**
+ * Checks if the current page URL matches the specified page name, step and hash array parameters.
+ */
+export function torn_page(
+  page: string,
+  params: TornPageParams = {},
+  match_hash: string[] = [],
+) {
+  const url_match =
+    window.location.href.startsWith(`https://www.torn.com/${page}.php`) ||
+    window.location.href.includes(`/${page}.php`);
+  if (!url_match) {
+    return false;
+  }
+
+  const search = new URLSearchParams(window.location.search);
+  let sid_match = true;
+  let step_match = true;
+  if (params.sid) {
+    const page_sid = search.get("sid");
+    sid_match = page_sid !== null && params.sid === page_sid;
+  }
+  if (params.step) {
+    const page_step = search.get("step");
+    step_match = page_step !== null && params.step === page_step;
+  }
+
+  if (!sid_match || !step_match) {
+    return false;
+  }
+
+  let hash_match = false;
+  if (match_hash.length === 0) {
+    hash_match = true;
+  } else {
+    const hash = window.location.hash;
+    for (const h of match_hash) {
+      if (hash === h) {
+        hash_match = true;
+        break;
+      }
+    }
+  }
+
+  return sid_match && step_match && hash_match;
+}
+
+/**
+ * Registers a callback for page navigation events (SPA hash/anchor changes and history pops).
+ * Automatically delays callback execution using setTimeout to ensure window.location is fully updated.
+ * Returns a cleanup function to remove all registered listeners.
+ */
+export function on_navigation(callback: () => void): () => void {
+  // Modern Navigation API (Chromium)
+  const nav = (window as any).navigation;
+  if (nav) {
+    nav.addEventListener("currententrychange", callback);
+    return () => {
+      nav.removeEventListener("currententrychange", callback);
+    };
+  }
+
+  const delayedCallback = () => {
+    setTimeout(callback, 0);
+  };
+
+  // Fallbacks for Firefox, Safari, and other environments
+  window.addEventListener("popstate", delayedCallback);
+  window.addEventListener("hashchange", delayedCallback);
+
+  return () => {
+    window.removeEventListener("popstate", delayedCallback);
+    window.removeEventListener("hashchange", delayedCallback);
+  };
+}
