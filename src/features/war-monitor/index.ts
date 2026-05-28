@@ -46,7 +46,7 @@ function shouldRunMonitor(): boolean {
   const hash = window.location.hash || "";
 
   // Exclude tab pages where the active war list is not displayed (e.g. territory, info, rank, controls, etc.)
-  if (hash.startsWith("#/tab=")) {
+  if (!hash.startsWith("#/war/")) {
     return false;
   }
 
@@ -1142,7 +1142,11 @@ const WarMonitorFeature: Feature = {
 
     const handleNavigation = () => {
       const shouldRun = shouldRunMonitor();
-      if (shouldRun && !active) {
+      if (shouldRun) {
+        if (stopMonitor) {
+          stopMonitor();
+          stopMonitor = null;
+        }
         startMonitor();
       } else if (!shouldRun && active) {
         if (stopMonitor) {
