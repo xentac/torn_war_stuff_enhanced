@@ -988,6 +988,7 @@ const WarMonitorFeature: Feature = {
       let innerDescriptionsObserver: MutationObserver | null = null;
 
       const initWarMonitoring = (descriptions: Element) => {
+        foundWar = false;
         log.info("Descriptions container detected. Starting observation.");
 
         let injectedToggle = false;
@@ -1016,8 +1017,9 @@ const WarMonitorFeature: Feature = {
 
           toggleContainer.innerHTML = `
             <label class="twse-sort-toggle-label">
-              <input type="checkbox" id="twse-war-sort-checkbox" class="twse-sort-toggle-checkbox" ${twseconfig.war_sorting ? "checked" : ""
-            } />
+              <input type="checkbox" id="twse-war-sort-checkbox" class="twse-sort-toggle-checkbox" ${
+                twseconfig.war_sorting ? "checked" : ""
+              } />
               TWSE Sort
             </label>
           `;
