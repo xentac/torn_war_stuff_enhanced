@@ -103,6 +103,7 @@ const WarMonitorFeature: Feature = {
       const minTimeBetweenRequestsMs = 10_000;
 
       const activeChains = new Map<string, ActiveChainState>();
+      let lastChainHtml = "";
 
       // Wire global event listeners for instant UI state synchronization
       const onConfigUpdated = () => {
@@ -490,12 +491,42 @@ const WarMonitorFeature: Feature = {
         );
       }
 
+      const attrCache = new WeakMap<Element, Record<string, string>>();
+      const styleCache = new WeakMap<HTMLElement, Record<string, string>>();
+      const cacheableAttrs = new Set([
+        "data-until",
+        "data-since",
+        "data-sortA",
+        "data-location",
+        "data-twse-traveling",
+        "data-twse-highlight",
+        "data-twse-status-differs",
+        "data-twse-overridden",
+      ]);
+
       // Set attributes with deferred writing to prevent layout thrashing
       function queueAttrWrite(
         elem: Element,
         attr: string,
         value: string,
       ): boolean {
+        if (cacheableAttrs.has(attr)) {
+          let cache = attrCache.get(elem);
+          if (!cache) {
+            cache = {};
+            attrCache.set(elem, cache);
+          }
+          if (cache[attr] === undefined) {
+            cache[attr] = elem.getAttribute(attr) || "";
+          }
+          if (cache[attr] !== value) {
+            cache[attr] = value;
+            deferredWrites.push([elem, attr, value]);
+            return true;
+          }
+          return false;
+        }
+
         if (elem.getAttribute(attr) !== value) {
           deferredWrites.push([elem, attr, value]);
           return true;
@@ -504,6 +535,22 @@ const WarMonitorFeature: Feature = {
       }
 
       function queueStyleWrite(elem: HTMLElement, prop: string, value: string) {
+        if (prop === "--twse-content") {
+          let cache = styleCache.get(elem);
+          if (!cache) {
+            cache = {};
+            styleCache.set(elem, cache);
+          }
+          if (cache[prop] === undefined) {
+            cache[prop] = elem.style.getPropertyValue(prop);
+          }
+          if (cache[prop] !== value) {
+            cache[prop] = value;
+            deferredStyles.push([elem, prop, value]);
+          }
+          return;
+        }
+
         if (elem.style.getPropertyValue(prop) !== value) {
           deferredStyles.push([elem, prop, value]);
         }
@@ -613,11 +660,7 @@ const WarMonitorFeature: Feature = {
 
           const status = memberStatus.get(id);
           if (!status || !running) {
-            queueStyleWrite(
-              statusDiv,
-              "--twse-content",
-              `"${statusDiv.textContent || ""}"`,
-            );
+            queueAttrWrite(statusDiv, "data-twse-overridden", "false");
             return;
           }
 
@@ -643,15 +686,12 @@ const WarMonitorFeature: Feature = {
                     dirtySort = true;
                   }
                 }
-                queueStyleWrite(
-                  statusDiv,
-                  "--twse-content",
-                  `"${statusDiv.textContent || ""}"`,
-                );
+                queueAttrWrite(statusDiv, "data-twse-overridden", "false");
                 break;
               }
 
               queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
+              queueAttrWrite(statusDiv, "data-twse-overridden", "true");
 
               if (status.description.includes("In ")) {
                 if (queueAttrWrite(li, "data-sortA", "4")) {
@@ -721,13 +761,9 @@ const WarMonitorFeature: Feature = {
                   }
                   queueAttrWrite(statusDiv, STATUS_DIFFERS, "true");
                 }
-                queueStyleWrite(
-                  statusDiv,
-                  "--twse-content",
-                  `"${statusDiv.textContent || ""}"`,
-                );
                 queueAttrWrite(statusDiv, TRAVELING, "false");
                 queueAttrWrite(statusDiv, HIGHLIGHT, "false");
+                queueAttrWrite(statusDiv, "data-twse-overridden", "false");
                 break;
               }
 
@@ -744,9 +780,11 @@ const WarMonitorFeature: Feature = {
 
               if (timeRemaining <= 0) {
                 queueAttrWrite(statusDiv, HIGHLIGHT, "false");
+                queueAttrWrite(statusDiv, "data-twse-overridden", "false");
                 break;
               }
 
+              queueAttrWrite(statusDiv, "data-twse-overridden", "true");
               const timeStr = calc_delta(timeRemaining);
               queueStyleWrite(statusDiv, "--twse-content", `"${timeStr}"`);
 
@@ -759,17 +797,13 @@ const WarMonitorFeature: Feature = {
             }
 
             default:
-              queueStyleWrite(
-                statusDiv,
-                "--twse-content",
-                `"${statusDiv.textContent || ""}"`,
-              );
               if (queueAttrWrite(li, "data-sortA", "1")) {
                 dirtySort = true;
               }
               queueAttrWrite(statusDiv, TRAVELING, "false");
               queueAttrWrite(statusDiv, HIGHLIGHT, "false");
               queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
+              queueAttrWrite(statusDiv, "data-twse-overridden", "false");
               break;
           }
 
@@ -927,6 +961,7 @@ const WarMonitorFeature: Feature = {
 
         if (!foundWar || activeChains.size === 0) {
           bubbleContainer.classList.add("hidden");
+          lastChainHtml = "";
           return;
         }
 
@@ -980,7 +1015,10 @@ const WarMonitorFeature: Feature = {
           `;
         });
 
-        bodyContainer.innerHTML = html;
+        if (lastChainHtml !== html) {
+          bodyContainer.innerHTML = html;
+          lastChainHtml = html;
+        }
         bubbleContainer.classList.remove("hidden");
       }
 
@@ -1057,6 +1095,13 @@ const WarMonitorFeature: Feature = {
             ids.forEach(populateCachedStatus);
             updateStatuses();
           }
+          if (foundWar && injectedToggle) {
+            log.info(
+              "Active war detected and toggle injected. Disconnecting innerDescriptionsObserver.",
+            );
+            innerDescriptionsObserver?.disconnect();
+            innerDescriptionsObserver = null;
+          }
         });
 
         if (descriptions.querySelector(".faction-war")) {
@@ -1065,6 +1110,14 @@ const WarMonitorFeature: Feature = {
           const ids = getFactionIds();
           ids.forEach(populateCachedStatus);
           updateStatuses();
+
+          if (injectedToggle) {
+            log.info(
+              "Active war detected at start and toggle injected. Disconnecting innerDescriptionsObserver.",
+            );
+            innerDescriptionsObserver?.disconnect();
+            innerDescriptionsObserver = null;
+          }
         }
       };
 

@@ -382,7 +382,7 @@ describe("WarMonitorFeature Sorting Config", () => {
     twseconfig.war_sorting = true;
     // Reset window.location
     global.window.location.href = "factions.php";
-    global.window.location.hash = "";
+    global.window.location.hash = "#/war/123";
   });
 
   afterEach(async () => {
@@ -957,7 +957,7 @@ describe("WarMonitorFeature Sorting Config", () => {
       documentMock.body = new MockElement("body");
       // Reset window.location
       global.window.location.href = "https://www.torn.com/factions.php";
-      global.window.location.hash = "";
+      global.window.location.hash = "#/war/123";
     });
 
     it("should start monitor if shouldRunMonitor() matches initially", async () => {
@@ -1033,8 +1033,8 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       expect(documentMock.getElementById("twse-chain-bubble")).toBeNull();
 
-      // Navigate back to factions.php#/
-      global.window.location.hash = "#/";
+      // Navigate back to factions.php#/war/123
+      global.window.location.hash = "#/war/123";
       global.window.dispatchEvent(new Event("popstate"));
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -1069,7 +1069,7 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       for (const targetHash of newlyExcludedHashes) {
         // Reset and start monitor
-        global.window.location.hash = "";
+        global.window.location.hash = "#/war/123";
         WarMonitorFeature.run();
         await new Promise((resolve) => setTimeout(resolve, 10));
 

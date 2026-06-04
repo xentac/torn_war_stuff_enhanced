@@ -25,12 +25,12 @@
   color: #ffed76 !important;
 }
 
-.members-list div.status {
+.members-list div.status[data-twse-overridden="true"] {
   position: relative !important;
   color: transparent !important;
 }
 
-.members-list div.status::after {
+.members-list div.status[data-twse-overridden="true"]::after {
   content: var(--twse-content);
   position: absolute;
   top: 0;
