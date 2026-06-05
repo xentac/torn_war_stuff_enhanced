@@ -158,6 +158,11 @@
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none !important;
+}
+
+.twse-chain-bubble * {
+  touch-action: none !important;
 }
 
 .twse-chain-bubble.hidden {

@@ -215,6 +215,13 @@ class MockElement {
     this.listeners[event].push(cb);
   }
 
+  removeEventListener(event: string, cb: (...args: any[]) => any) {
+    const list = this.listeners[event];
+    if (list) {
+      this.listeners[event] = list.filter((item) => item !== cb);
+    }
+  }
+
   dispatchEvent(event: any) {
     const type = event.type || event;
     const list = this.listeners[type] || [];
@@ -772,6 +779,95 @@ describe("WarMonitorFeature Sorting Config", () => {
 
     // Verify position was saved
     expect(twseconfig.bubble_position).toEqual({ left: 20, top: 20 });
+
+    // Clean up
+    vi.useRealTimers();
+    spy.mockRestore();
+  });
+
+  it("should clean up drag listeners and state on touchcancel", async () => {
+    const { tornApi } = await import("@utils/api");
+    const { twseconfig } = await import("@utils/config");
+    twseconfig.apiKey = "1234567890123456";
+
+    const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+      ID: 999,
+      name: "Test Faction",
+      tag: "TST",
+      members: {},
+      chain: {
+        current: 42,
+        max: 100,
+        timeout: 120,
+        modifier: 1.5,
+        cooldown: 0,
+        end: Date.now() / 1000 + 120,
+      },
+    });
+
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/factions.php?ID=999");
+    ul.appendChild(atag);
+
+    descriptions.appendChild(ul);
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    global.MutationObserver = class {
+      observe = () => {};
+      disconnect = () => {};
+    } as any;
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 60000);
+    WarMonitorFeature.run();
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(10000);
+    await vi.advanceTimersByTimeAsync(500);
+
+    const bubble = documentMock.getElementById("twse-chain-bubble") as any;
+    expect(bubble).not.toBeNull();
+
+    // Start drag with touchstart
+    let preventDefaultCalled = false;
+    bubble.dispatchEvent({
+      type: "touchstart",
+      touches: [{ clientX: 100, clientY: 100 }],
+      cancelable: true,
+      preventDefault: () => {
+        preventDefaultCalled = true;
+      },
+    });
+
+    expect(preventDefaultCalled).toBe(true);
+
+    // Cancel the touch sequence with touchcancel on bubble
+    bubble.dispatchEvent({
+      type: "touchcancel",
+    });
+
+    // Reset bubble position manually to make sure any future move behaves correctly
+    bubble.style.left = "0px";
+    bubble.style.top = "0px";
+
+    // Attempt to move - should NOT affect bubble position since listeners should be removed
+    bubble.dispatchEvent({
+      type: "touchmove",
+      touches: [{ clientX: 150, clientY: 150 }],
+      cancelable: true,
+      preventDefault: () => {},
+    });
+
+    // Position shouldn't have changed to 150
+    expect(bubble.style.left).toBe("0px");
+    expect(bubble.style.top).toBe("0px");
 
     // Clean up
     vi.useRealTimers();

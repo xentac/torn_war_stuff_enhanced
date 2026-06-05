@@ -104,6 +104,7 @@ const WarMonitorFeature: Feature = {
 
       const activeChains = new Map<string, ActiveChainState>();
       let lastChainHtml = "";
+      let isDragging = false;
 
       // Wire global event listeners for instant UI state synchronization
       const onConfigUpdated = () => {
@@ -195,7 +196,6 @@ const WarMonitorFeature: Feature = {
           setTimeout(clampToScreen, 0);
         }
 
-        let isDragging = false;
         let startX = 0;
         let startY = 0;
         let initialX = 0;
@@ -228,26 +228,42 @@ const WarMonitorFeature: Feature = {
             bubbleContainer.style.cursor = "grabbing";
           }
 
-          // Prevent surrounding text selection on desktop
-          if (!isTouch && e.cancelable) {
+          if (isTouch) {
+            e.stopPropagation();
+          }
+
+          // Prevent surrounding text selection and default scroll behaviors
+          if (e.cancelable) {
             e.preventDefault();
           }
           window.getSelection()?.removeAllRanges();
 
-          document.addEventListener("mousemove", dragMove);
-          document.addEventListener("touchmove", dragMove, { passive: false });
-          document.addEventListener("mouseup", dragEnd);
-          document.addEventListener("touchend", dragEnd);
+          if (isTouch) {
+            if (bubbleContainer) {
+              bubbleContainer.addEventListener("touchmove", dragMove, {
+                passive: false,
+              });
+              bubbleContainer.addEventListener("touchend", dragEnd);
+              bubbleContainer.addEventListener("touchcancel", dragEnd);
+            }
+          } else {
+            document.addEventListener("mousemove", dragMove);
+            document.addEventListener("mouseup", dragEnd);
+          }
         };
 
         const dragMove = (e: MouseEvent | TouchEvent) => {
           if (!isDragging || !bubbleContainer) return;
 
+          const isTouch = e.type === "touchmove";
+          if (isTouch) {
+            e.stopPropagation();
+          }
+
           if (e.cancelable) {
             e.preventDefault();
           }
 
-          const isTouch = e.type === "touchmove";
           const touchEvent = e as TouchEvent;
           const mouseEvent = e as MouseEvent;
           const clientX =
@@ -281,20 +297,29 @@ const WarMonitorFeature: Feature = {
           bubbleContainer.style.top = `${newTop}px`;
         };
 
-        const dragEnd = () => {
+        const dragEnd = (e?: MouseEvent | TouchEvent) => {
           isDragging = false;
+          if (e && (e.type === "touchend" || e.type === "touchcancel")) {
+            e.stopPropagation();
+          }
+
           if (bubbleContainer) {
             bubbleContainer.style.cursor = "grab";
 
             const left = parseFloat(bubbleContainer.style.left) || 0;
             const top = parseFloat(bubbleContainer.style.top) || 0;
             twseconfig.bubble_position = { left, top };
+
+            bubbleContainer.removeEventListener("touchmove", dragMove);
+            bubbleContainer.removeEventListener("touchend", dragEnd);
+            bubbleContainer.removeEventListener("touchcancel", dragEnd);
           }
 
           document.removeEventListener("mousemove", dragMove);
-          document.removeEventListener("touchmove", dragMove);
           document.removeEventListener("mouseup", dragEnd);
-          document.removeEventListener("touchend", dragEnd);
+
+          // Force a draw update immediately after dragging ends
+          updateChainBubble();
         };
 
         bubbleContainer.addEventListener("mousedown", dragStart);
@@ -957,7 +982,7 @@ const WarMonitorFeature: Feature = {
       }
 
       function updateChainBubble() {
-        if (!bubbleContainer) return;
+        if (!bubbleContainer || isDragging) return;
 
         if (!foundWar || activeChains.size === 0) {
           bubbleContainer.classList.add("hidden");
