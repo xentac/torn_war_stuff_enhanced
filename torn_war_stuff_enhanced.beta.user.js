@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta9
+// @version      2.0-beta10
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1459,7 +1459,7 @@ clearAll() {
       to: shorten_destination(match[2])
     };
   }
-  const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}.members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:9999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}";
+  const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}.members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:9999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}";
   importCSS(stylesCss);
   const log$1 = logger.child("feature:war-monitor");
   const TRAVELING = "data-twse-traveling";
@@ -1513,6 +1513,7 @@ clearAll() {
         const minTimeBetweenRequestsMs = 1e4;
         const activeChains = new Map();
         let lastChainHtml = "";
+        let isDragging = false;
         const onConfigUpdated = () => {
           syncBodyClasses();
           const checkbox = document.querySelector(
@@ -1579,7 +1580,6 @@ clearAll() {
             bubbleContainer.style.top = `${savedPos.top}px`;
             setTimeout(clampToScreen, 0);
           }
-          let isDragging = false;
           let startX = 0;
           let startY = 0;
           let initialX = 0;
@@ -1600,21 +1600,35 @@ clearAll() {
               bubbleContainer.style.transition = "none";
               bubbleContainer.style.cursor = "grabbing";
             }
-            if (!isTouch && e2.cancelable) {
-              e2.preventDefault();
+            if (isTouch) {
+              e2.stopPropagation();
             }
-            window.getSelection()?.removeAllRanges();
-            document.addEventListener("mousemove", dragMove);
-            document.addEventListener("touchmove", dragMove, { passive: false });
-            document.addEventListener("mouseup", dragEnd);
-            document.addEventListener("touchend", dragEnd);
-          };
-          const dragMove = (e2) => {
-            if (!isDragging || !bubbleContainer) return;
             if (e2.cancelable) {
               e2.preventDefault();
             }
+            window.getSelection()?.removeAllRanges();
+            if (isTouch) {
+              if (bubbleContainer) {
+                bubbleContainer.addEventListener("touchmove", dragMove, {
+                  passive: false
+                });
+                bubbleContainer.addEventListener("touchend", dragEnd);
+                bubbleContainer.addEventListener("touchcancel", dragEnd);
+              }
+            } else {
+              document.addEventListener("mousemove", dragMove);
+              document.addEventListener("mouseup", dragEnd);
+            }
+          };
+          const dragMove = (e2) => {
+            if (!isDragging || !bubbleContainer) return;
             const isTouch = e2.type === "touchmove";
+            if (isTouch) {
+              e2.stopPropagation();
+            }
+            if (e2.cancelable) {
+              e2.preventDefault();
+            }
             const touchEvent = e2;
             const mouseEvent = e2;
             const clientX = isTouch && touchEvent.touches && touchEvent.touches.length > 0 ? touchEvent.touches[0].clientX : mouseEvent.clientX;
@@ -1635,18 +1649,23 @@ clearAll() {
             bubbleContainer.style.left = `${newLeft}px`;
             bubbleContainer.style.top = `${newTop}px`;
           };
-          const dragEnd = () => {
+          const dragEnd = (e2) => {
             isDragging = false;
+            if (e2 && (e2.type === "touchend" || e2.type === "touchcancel")) {
+              e2.stopPropagation();
+            }
             if (bubbleContainer) {
               bubbleContainer.style.cursor = "grab";
               const left = parseFloat(bubbleContainer.style.left) || 0;
               const top = parseFloat(bubbleContainer.style.top) || 0;
               twseconfig.bubble_position = { left, top };
+              bubbleContainer.removeEventListener("touchmove", dragMove);
+              bubbleContainer.removeEventListener("touchend", dragEnd);
+              bubbleContainer.removeEventListener("touchcancel", dragEnd);
             }
             document.removeEventListener("mousemove", dragMove);
-            document.removeEventListener("touchmove", dragMove);
             document.removeEventListener("mouseup", dragEnd);
-            document.removeEventListener("touchend", dragEnd);
+            updateChainBubble();
           };
           bubbleContainer.addEventListener("mousedown", dragStart);
           bubbleContainer.addEventListener("touchstart", dragStart, {
@@ -2187,7 +2206,7 @@ clearAll() {
           updateChainBubble();
         }
         function updateChainBubble() {
-          if (!bubbleContainer) return;
+          if (!bubbleContainer || isDragging) return;
           if (!foundWar || activeChains.size === 0) {
             bubbleContainer.classList.add("hidden");
             lastChainHtml = "";
