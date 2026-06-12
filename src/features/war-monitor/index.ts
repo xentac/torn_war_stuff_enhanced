@@ -622,7 +622,9 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
 
         const lis = Array.from(listElem.childNodes) as HTMLLIElement[];
-        const validLis = lis.filter((node) => node.nodeType === Node.ELEMENT_NODE);
+        const validLis = lis.filter(
+          (node) => node.nodeType === Node.ELEMENT_NODE,
+        );
         const sortedLis = validLis.sort((a, b) => {
           let left = a;
           let right = b;
@@ -646,15 +648,39 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           // Tier A (unexpected transitions): newest transition first
           if (sortA_a === 0) {
-            const unexpectedAt_a = parseInt(left.getAttribute("data-unexpected-at") || "0", 10);
-            const unexpectedAt_b = parseInt(right.getAttribute("data-unexpected-at") || "0", 10);
+            const unexpectedAt_a = parseInt(
+              left.getAttribute("data-unexpected-at") || "0",
+              10,
+            );
+            const unexpectedAt_b = parseInt(
+              right.getAttribute("data-unexpected-at") || "0",
+              10,
+            );
             return unexpectedAt_b - unexpectedAt_a;
           }
 
           // Tier B (stable Okay): oldest since first to preserve initial DOM order
           if (sortA_a === 1) {
-            const since_a = parseInt(left.getAttribute("data-since") || "0", 10);
-            const since_b = parseInt(right.getAttribute("data-since") || "0", 10);
+            const since_a = parseInt(
+              left.getAttribute("data-since") || "0",
+              10,
+            );
+            const since_b = parseInt(
+              right.getAttribute("data-since") || "0",
+              10,
+            );
+            if (since_a === since_b) {
+              // We need to have a consistent sort order if since is the same for both players
+              const id_a = parseInt(
+                left.getAttribute("data-player_id") || "0",
+                10,
+              );
+              const id_b = parseInt(
+                right.getAttribute("data-player_id") || "0",
+                10,
+              );
+              return id_a - id_b;
+            }
             return since_a - since_b;
           }
 
@@ -686,12 +712,16 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         const memberLists = document.querySelectorAll("ul.members-list");
         for (let i = 0; i < memberLists.length; i++) {
           const ul = memberLists[i];
-          const obs = observeElement(ul, () => {
-            if (_isSorting || !twseconfig.war_sorting) return;
-            _isSorting = true;
-            sortMemberList(ul);
-            _isSorting = false;
-          }, { childList: true });
+          const obs = observeElement(
+            ul,
+            () => {
+              if (_isSorting || !twseconfig.war_sorting) return;
+              _isSorting = true;
+              sortMemberList(ul);
+              _isSorting = false;
+            },
+            { childList: true },
+          );
           memberListObservers.push(obs);
         }
       }
@@ -808,6 +838,9 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             dirtySort = true;
           }
           if (queueAttrWrite(li, "data-since", String(status.since))) {
+            dirtySort = true;
+          }
+          if (queueAttrWrite(li, "data-player_id", String(id))) {
             dirtySort = true;
           }
 
