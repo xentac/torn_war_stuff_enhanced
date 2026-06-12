@@ -179,3 +179,19 @@ export function on_navigation(callback: () => void): () => void {
     window.removeEventListener("hashchange", delayedCallback);
   };
 }
+
+/**
+ * Returns > 0 if a's attribute value is greater than b's attribute value, when converted to an int
+ * Reurns < 0 if a's attribute value is less than b's
+ * Returns 0 if equal
+ */
+export function sort_by_attribute(
+  a: HTMLElement,
+  b: HTMLElement,
+  attr: string,
+  d: number = 0,
+) {
+  const left = parseInt(a.getAttribute(attr) || `${d}`, 10);
+  const right = parseInt(b.getAttribute(attr) || `${d}`, 10);
+  return left - right;
+}

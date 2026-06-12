@@ -1,7 +1,12 @@
 import { tornApi } from "@utils/api";
 import { factionCache } from "@utils/cache";
 import { twseconfig } from "@utils/config";
-import { observeElement, on_navigation, waitForElement } from "@utils/dom";
+import {
+  observeElement,
+  on_navigation,
+  sort_by_attribute,
+  waitForElement,
+} from "@utils/dom";
 import logger from "@utils/logger";
 import {
   calc_delta,
@@ -633,9 +638,8 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             right = a;
           }
 
+          const sorta = sort_by_attribute(left, right, "data-sortA", 1);
           const sortA_a = parseInt(left.getAttribute("data-sortA") || "1", 10);
-          const sortA_b = parseInt(right.getAttribute("data-sortA") || "1", 10);
-          const sorta = sortA_a - sortA_b;
           if (sorta !== 0) return sorta;
 
           const leftLocation = left.getAttribute("data-location") || "";
@@ -648,45 +652,24 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           // Tier A (unexpected transitions): newest transition first
           if (sortA_a === 0) {
-            const unexpectedAt_a = parseInt(
-              left.getAttribute("data-unexpected-at") || "0",
-              10,
-            );
-            const unexpectedAt_b = parseInt(
-              right.getAttribute("data-unexpected-at") || "0",
-              10,
-            );
-            return unexpectedAt_b - unexpectedAt_a;
+            return sort_by_attribute(left, right, "data-unexpected-at");
           }
 
           // Tier B: oldest okay-since first; expected exits land at bottom ordered by expiry time
           if (sortA_a === 1) {
-            const since_a = parseInt(
-              left.getAttribute("data-okay-since") || "0",
-              10,
-            );
-            const since_b = parseInt(
-              right.getAttribute("data-okay-since") || "0",
-              10,
-            );
-            if (since_a === since_b) {
-              const id_a = parseInt(
-                left.getAttribute("data-player_id") || "0",
-                10,
-              );
-              const id_b = parseInt(
-                right.getAttribute("data-player_id") || "0",
-                10,
-              );
-              return id_a - id_b;
+            const okaysince = sort_by_attribute(left, right, "data-okay-since");
+            if (okaysince === 0) {
+              const est = sort_by_attribute(left, right, "data-est-value");
+              if (est === 0) {
+                return sort_by_attribute(left, right, "data-player_id");
+              }
+              return est * -1; // If we have estimates, sort them descending
             }
-            return since_a - since_b;
+            return okaysince;
           }
 
           // Hospital timers: soonest first
-          const until_a = parseInt(left.getAttribute("data-until") || "0", 10);
-          const until_b = parseInt(right.getAttribute("data-until") || "0", 10);
-          return until_a - until_b;
+          return sort_by_attribute(left, right, "data-until");
         });
 
         let sorted = true;
@@ -811,6 +794,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         deferredStyles.length = 0;
 
         let dirtySort = false;
+        const okaySince = Date.now();
 
         memberLis.forEach((elem, id) => {
           const li = elem.li;
@@ -988,7 +972,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
                 dirtySort = true;
               }
               if (sortAValue === "1" && !li.getAttribute("data-okay-since")) {
-                if (queueAttrWrite(li, "data-okay-since", String(Date.now()))) {
+                if (queueAttrWrite(li, "data-okay-since", String(okaySince))) {
                   dirtySort = true;
                 }
               }
