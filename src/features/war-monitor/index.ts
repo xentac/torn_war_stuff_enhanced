@@ -700,7 +700,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
         if (!sorted) {
           const fragment = document.createDocumentFragment();
-          sortedLis.forEach((li) => fragment.appendChild(li));
+          for (const li of sortedLis) fragment.appendChild(li);
           listElem.appendChild(fragment);
         }
       }
