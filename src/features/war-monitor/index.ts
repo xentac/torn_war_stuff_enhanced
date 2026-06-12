@@ -942,6 +942,9 @@ const WarMonitorFeature: WarMonitorFeatureType = {
                   }
                 } else {
                   // Expected exit: timer expired, DOM confirms Okay → Tier B
+                  // Clear any unexpectedTransitions entry that was spuriously set during DOM lag
+                  // at the start of this hospital stint (brief re-hospitalization not caught by DOM)
+                  unexpectedTransitions.delete(id);
                   if (queueAttrWrite(li, "data-sortA", "1")) {
                     dirtySort = true;
                   }
