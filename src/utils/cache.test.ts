@@ -30,7 +30,6 @@ describe("FactionCache", () => {
       state: "Okay",
       description: "Okay",
       until: 0,
-      since: 1700000000,
     },
   };
 

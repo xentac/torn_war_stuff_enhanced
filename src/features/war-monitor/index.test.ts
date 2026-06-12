@@ -1155,7 +1155,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Hospital",
               description: "In the hospital",
               until: futureUntil,
-              since: Date.now(),
             },
           },
         },
@@ -1197,7 +1196,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Traveling",
               description: "Traveling from Japan to Torn",
               until: 0,
-              since: Date.now(),
             },
           },
         },
@@ -1235,7 +1233,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Hospital",
               description: "In the hospital",
               until: pastUntil,
-              since: Date.now(),
             },
           },
         },
@@ -1279,7 +1276,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Hospital",
               description: "In the hospital",
               until: futureUntil,
-              since: Date.now(),
             },
           },
         },
@@ -1304,7 +1300,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Okay",
               description: "Okay",
               until: 0,
-              since: Date.now(),
             },
           },
         },
@@ -1341,7 +1336,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Hospital",
               description: "In the hospital",
               until: futureUntil,
-              since: Date.now(),
             },
           },
         },
@@ -1395,7 +1389,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Hospital",
               description: "In the hospital",
               until: futureUntil,
-              since: Date.now(),
             },
           },
         },
@@ -1436,7 +1429,6 @@ describe("WarMonitorFeature Sorting Config", () => {
         { id: "11", statusClass: "ok", statusText: "Okay" },
       ]);
 
-      const baseSince = Date.now() - 5000;
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
         ID: 999,
         name: "F",
@@ -1450,7 +1442,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Okay",
               description: "Okay",
               until: 0,
-              since: baseSince,
             },
           },
           "11": {
@@ -1461,7 +1452,6 @@ describe("WarMonitorFeature Sorting Config", () => {
               state: "Okay",
               description: "Okay",
               until: 0,
-              since: baseSince + 1000,
             },
           },
         },
@@ -1477,7 +1467,7 @@ describe("WarMonitorFeature Sorting Config", () => {
         c.className.includes("enemy"),
       ) as any[];
 
-      // Tier B ascending since: member 10 (older since) should be first
+      // Tier B tiebreaker: equal okay-since → player_id ascending, so member 10 sorts before 11
       expect(
         lis[0]?.querySelector("a[href^='/profiles.php']")?.getAttribute("href"),
       ).toContain("ID=10");

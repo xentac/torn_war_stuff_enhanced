@@ -5,7 +5,6 @@ export interface FactionMemberStatus {
   state: "Okay" | "Traveling" | "Hospital" | "Jail" | "Abroad" | "Unknown";
   description: string;
   until: TimestampSec;
-  since: TimestampMs;
   last_req_time?: TimestampMs;
 }
 

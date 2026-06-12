@@ -544,7 +544,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       const styleCache = new WeakMap<HTMLElement, Record<string, string>>();
       const cacheableAttrs = new Set([
         "data-until",
-        "data-since",
+        "data-okay-since",
         "data-sortA",
         "data-location",
         "data-unexpected-at",
@@ -659,18 +659,17 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             return unexpectedAt_b - unexpectedAt_a;
           }
 
-          // Tier B (stable Okay): oldest since first to preserve initial DOM order
+          // Tier B: oldest okay-since first; expected exits land at bottom ordered by expiry time
           if (sortA_a === 1) {
             const since_a = parseInt(
-              left.getAttribute("data-since") || "0",
+              left.getAttribute("data-okay-since") || "0",
               10,
             );
             const since_b = parseInt(
-              right.getAttribute("data-since") || "0",
+              right.getAttribute("data-okay-since") || "0",
               10,
             );
             if (since_a === since_b) {
-              // We need to have a consistent sort order if since is the same for both players
               const id_a = parseInt(
                 left.getAttribute("data-player_id") || "0",
                 10,
@@ -785,16 +784,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             const status = memberData.status;
             status.last_req_time = reqTime;
 
-            const prev = memberStatus.get(id);
-            const prev_state = prev?.state ?? "Unknown";
-            const prev_since = prev?.since ?? reqTime;
-
-            if (prev_state === status.state) {
-              status.since = prev_since;
-            } else {
-              status.since = reqTime;
-            }
-
             memberStatus.set(id, status);
             factionStatus[id] = status;
           }
@@ -837,9 +826,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           if (queueAttrWrite(li, "data-until", String(status.until))) {
             dirtySort = true;
           }
-          if (queueAttrWrite(li, "data-since", String(status.since))) {
-            dirtySort = true;
-          }
           if (queueAttrWrite(li, "data-player_id", String(id))) {
             dirtySort = true;
           }
@@ -868,6 +854,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
               // DOM confirms traveling — clear any unexpected transition flag
               unexpectedTransitions.delete(id);
+              queueAttrWrite(li, "data-okay-since", "");
               queueAttrWrite(statusDiv, "data-twse-overridden", "true");
 
               if (status.description.includes("In ")) {
@@ -945,6 +932,13 @@ const WarMonitorFeature: WarMonitorFeatureType = {
                   // Clear any unexpectedTransitions entry that was spuriously set during DOM lag
                   // at the start of this hospital stint (brief re-hospitalization not caught by DOM)
                   unexpectedTransitions.delete(id);
+                  // Set sort epoch to hospital expiry time so earlier-expiring members sort above
+                  // later-expiring ones; stable across subsequent polls unlike raw API data
+                  if (
+                    queueAttrWrite(li, "data-okay-since", `${status.until}000`)
+                  ) {
+                    dirtySort = true;
+                  }
                   if (queueAttrWrite(li, "data-sortA", "1")) {
                     dirtySort = true;
                   }
@@ -957,6 +951,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
               // DOM confirms hospital/jail — clear any unexpected transition flag
               unexpectedTransitions.delete(id);
+              queueAttrWrite(li, "data-okay-since", "");
               if (queueAttrWrite(li, "data-sortA", "2")) {
                 dirtySort = true;
               }
@@ -991,6 +986,11 @@ const WarMonitorFeature: WarMonitorFeatureType = {
               const sortAValue = unexpectedTransitions.has(id) ? "0" : "1";
               if (queueAttrWrite(li, "data-sortA", sortAValue)) {
                 dirtySort = true;
+              }
+              if (sortAValue === "1" && !li.getAttribute("data-okay-since")) {
+                if (queueAttrWrite(li, "data-okay-since", String(Date.now()))) {
+                  dirtySort = true;
+                }
               }
               queueAttrWrite(statusDiv, TRAVELING, "false");
               queueAttrWrite(statusDiv, HIGHLIGHT, "false");
