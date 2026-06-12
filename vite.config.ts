@@ -92,8 +92,5 @@ export default defineConfig(({ mode }) => {
       minify: false,
       sourcemap: isDev ? "inline" : false,
     },
-    test: {
-      testTimeout: 20_000,
-    },
   };
 });

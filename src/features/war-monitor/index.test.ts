@@ -399,9 +399,8 @@ global.window = {
   getSelection: () => ({ removeAllRanges: () => {} }),
 } as any;
 
-class NodeConstructor {
-  static ELEMENT_NODE = 1;
-}
+function NodeConstructor() {}
+(NodeConstructor as any).ELEMENT_NODE = 1;
 global.Node = NodeConstructor as any;
 
 // 3. Import dynamic modules
@@ -419,6 +418,12 @@ describe("WarMonitorFeature Sorting Config", () => {
   });
 
   afterEach(async () => {
+    // Restore default intervals
+    WarMonitorFeature.intervals.poll = 10_000;
+    WarMonitorFeature.intervals.watch = 500;
+    WarMonitorFeature.intervals.minTimeBetweenRequests = 10_000;
+    WarMonitorFeature.intervals.unexpectedHighlight = 10_000;
+
     // Restore real timers first to ensure setTimeout/promises in afterEach can resolve
     vi.useRealTimers();
     // Navigate away to trigger stopMonitor() and clean up all intervals, observers, and listeners
@@ -1251,6 +1256,10 @@ describe("WarMonitorFeature Sorting Config", () => {
     });
 
     it("should persist sortA=0 in default branch after API catches up to Okay", async () => {
+      WarMonitorFeature.intervals.poll = 100;
+      WarMonitorFeature.intervals.watch = 50;
+      WarMonitorFeature.intervals.minTimeBetweenRequests = 100;
+
       const { tornApi } = await import("@utils/api");
       const futureUntil = Math.floor(Date.now() / 1000) + 300;
 
@@ -1279,7 +1288,7 @@ describe("WarMonitorFeature Sorting Config", () => {
       vi.useFakeTimers();
       WarMonitorFeature.run();
       await vi.advanceTimersByTimeAsync(100);
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(50);
 
       // Second poll: API has caught up, now says Okay — flag must persist
       spy.mockResolvedValue({
@@ -1301,8 +1310,8 @@ describe("WarMonitorFeature Sorting Config", () => {
         },
       } as any);
 
-      await vi.advanceTimersByTimeAsync(10_000); // trigger next poll
-      await vi.advanceTimersByTimeAsync(500); // trigger watch
+      await vi.advanceTimersByTimeAsync(100); // trigger next poll
+      await vi.advanceTimersByTimeAsync(50); // trigger watch
 
       const ul = documentMock.body.querySelector("ul.members-list") as any;
       const li = ul?.children.find((c: any) => c.className.includes("enemy"));
@@ -1365,6 +1374,9 @@ describe("WarMonitorFeature Sorting Config", () => {
     });
 
     it("should decay highlight after UNEXPECTED_HIGHLIGHT_MS while keeping sortA=0", async () => {
+      WarMonitorFeature.intervals.watch = 50;
+      WarMonitorFeature.intervals.unexpectedHighlight = 200;
+
       const { tornApi } = await import("@utils/api");
       const futureUntil = Math.floor(Date.now() / 1000) + 300;
 
@@ -1392,7 +1404,7 @@ describe("WarMonitorFeature Sorting Config", () => {
       vi.useFakeTimers();
       WarMonitorFeature.run();
       await vi.advanceTimersByTimeAsync(100);
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(50);
 
       const ul = documentMock.body.querySelector("ul.members-list") as any;
       const li = ul?.children.find((c: any) => c.className.includes("enemy"));
@@ -1404,9 +1416,9 @@ describe("WarMonitorFeature Sorting Config", () => {
       expect(statusDiv?.getAttribute("data-twse-status-differs")).toBe("true");
       expect(li?.getAttribute("data-sortA")).toBe("0");
 
-      // Advance past UNEXPECTED_HIGHLIGHT_MS (10 seconds)
-      await vi.advanceTimersByTimeAsync(10_000);
-      await vi.advanceTimersByTimeAsync(500);
+      // Advance past UNEXPECTED_HIGHLIGHT_MS (200 ms)
+      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(50);
 
       // Highlight gone but still Tier A
       expect(statusDiv?.getAttribute("data-twse-status-differs")).toBe("false");

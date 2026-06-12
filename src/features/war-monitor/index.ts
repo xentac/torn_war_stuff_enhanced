@@ -53,11 +53,27 @@ function shouldRunMonitor(): boolean {
   return true;
 }
 
-const WarMonitorFeature: Feature = {
+interface WarMonitorFeatureType extends Feature {
+  intervals: {
+    poll: number;
+    watch: number;
+    minTimeBetweenRequests: number;
+    unexpectedHighlight: number;
+  };
+}
+
+const WarMonitorFeature: WarMonitorFeatureType = {
   name: "War Monitor",
   description:
     "Monitors active Faction wars, retrieves real-time member statuses, and decorates rows",
   executionTime: StartTime.DocumentEnd,
+
+  intervals: {
+    poll: 10_000,
+    watch: 500,
+    minTimeBetweenRequests: 10_000,
+    unexpectedHighlight: 10_000,
+  },
 
   shouldRun(): boolean {
     return window.location.href.includes("factions.php");
@@ -100,10 +116,12 @@ const WarMonitorFeature: Feature = {
       const deferredWrites: [Element, string, string][] = [];
       const deferredStyles: [HTMLElement, string, string][] = [];
 
-      const UNEXPECTED_HIGHLIGHT_MS = 10_000;
+      const UNEXPECTED_HIGHLIGHT_MS =
+        WarMonitorFeature.intervals.unexpectedHighlight;
 
       let lastRequestTime = 0;
-      const minTimeBetweenRequestsMs = 10_000;
+      const minTimeBetweenRequestsMs =
+        WarMonitorFeature.intervals.minTimeBetweenRequests;
 
       const activeChains = new Map<string, ActiveChainState>();
       let lastChainHtml = "";
@@ -1228,14 +1246,14 @@ const WarMonitorFeature: Feature = {
         if (running && foundWar) {
           updateStatuses();
         }
-      }, 10_000);
+      }, WarMonitorFeature.intervals.poll);
 
       // Set countdown draw timers (updates clock draw variables every 500ms)
       const watchInterval = setInterval(() => {
         if (foundWar && running && pageVisible) {
           watch();
         }
-      }, 500);
+      }, WarMonitorFeature.intervals.watch);
 
       stopMonitor = () => {
         active = false;
