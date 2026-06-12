@@ -126,6 +126,8 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       const activeChains = new Map<string, ActiveChainState>();
       let lastChainHtml = "";
       let isDragging = false;
+      let _isSorting = false;
+      const memberListObservers: MutationObserver[] = [];
 
       // Wire global event listeners for instant UI state synchronization
       const onConfigUpdated = () => {
@@ -604,6 +606,96 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
       }
 
+      function sortMemberList(listElem: Element) {
+        let sortedColumn = getSortedColumn(listElem);
+        if (!everSorted) {
+          sortedColumn = { column: "status", order: "asc" };
+        }
+
+        if (listElem.getAttribute("data-ffscouter-active-filter") === "true") {
+          ffscouterSortingDeferred = true;
+          return;
+        }
+
+        if (sortedColumn.column !== "status") {
+          return;
+        }
+
+        const lis = Array.from(listElem.childNodes) as HTMLLIElement[];
+        const validLis = lis.filter((node) => node.nodeType === Node.ELEMENT_NODE);
+        const sortedLis = validLis.sort((a, b) => {
+          let left = a;
+          let right = b;
+          if (sortedColumn.order === "desc") {
+            left = b;
+            right = a;
+          }
+
+          const sortA_a = parseInt(left.getAttribute("data-sortA") || "1", 10);
+          const sortA_b = parseInt(right.getAttribute("data-sortA") || "1", 10);
+          const sorta = sortA_a - sortA_b;
+          if (sorta !== 0) return sorta;
+
+          const leftLocation = left.getAttribute("data-location") || "";
+          const rightLocation = right.getAttribute("data-location") || "";
+          if (leftLocation && rightLocation) {
+            if (leftLocation < rightLocation) return -1;
+            if (leftLocation > rightLocation) return 1;
+            return 0;
+          }
+
+          // Tier A (unexpected transitions): newest transition first
+          if (sortA_a === 0) {
+            const unexpectedAt_a = parseInt(left.getAttribute("data-unexpected-at") || "0", 10);
+            const unexpectedAt_b = parseInt(right.getAttribute("data-unexpected-at") || "0", 10);
+            return unexpectedAt_b - unexpectedAt_a;
+          }
+
+          // Tier B (stable Okay): oldest since first to preserve initial DOM order
+          if (sortA_a === 1) {
+            const since_a = parseInt(left.getAttribute("data-since") || "0", 10);
+            const since_b = parseInt(right.getAttribute("data-since") || "0", 10);
+            return since_a - since_b;
+          }
+
+          // Hospital timers: soonest first
+          const until_a = parseInt(left.getAttribute("data-until") || "0", 10);
+          const until_b = parseInt(right.getAttribute("data-until") || "0", 10);
+          return until_a - until_b;
+        });
+
+        let sorted = true;
+        for (let j = 0; j < sortedLis.length; j++) {
+          if (listElem.children[j] !== sortedLis[j]) {
+            sorted = false;
+            break;
+          }
+        }
+
+        if (!sorted) {
+          const fragment = document.createDocumentFragment();
+          sortedLis.forEach((li) => fragment.appendChild(li));
+          listElem.appendChild(fragment);
+        }
+      }
+
+      function setupMemberListObservers() {
+        for (const obs of memberListObservers) obs.disconnect();
+        memberListObservers.length = 0;
+
+        const memberLists = document.querySelectorAll("ul.members-list");
+        for (let i = 0; i < memberLists.length; i++) {
+          const ul = memberLists[i];
+          const obs = observeElement(ul, () => {
+            if (_isSorting || !twseconfig.war_sorting) return;
+            _isSorting = true;
+            sortMemberList(ul);
+            _isSorting = false;
+          }, { childList: true });
+          memberListObservers.push(obs);
+        }
+      }
+
       function calculateFlightTimeRemaining(li: HTMLLIElement): string {
         const earliestArrivalAttr = li.getAttribute("data-earliest-arrival");
         const latestArrivalAttr = li.getAttribute("data-latest-arrival");
@@ -910,114 +1002,12 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
         // Handle custom sorting routine
         if (twseconfig.war_sorting && dirtySort) {
+          _isSorting = true;
           const memberLists = document.querySelectorAll("ul.members-list");
           for (let i = 0; i < memberLists.length; i++) {
-            const listElem = memberLists[i];
-            let sortedColumn = getSortedColumn(listElem);
-            if (!everSorted) {
-              sortedColumn = { column: "status", order: "asc" };
-            }
-
-            // If FF Scouter is currently sorting this list, defer our sorting:
-            if (
-              listElem.getAttribute("data-ffscouter-active-filter") === "true"
-            ) {
-              ffscouterSortingDeferred = true;
-              continue;
-            }
-
-            if (sortedColumn.column !== "status") {
-              continue;
-            }
-
-            const lis = Array.from(listElem.childNodes) as HTMLLIElement[];
-            // Filter to avoid comment or text nodes if any
-            const validLis = lis.filter(
-              (node) => node.nodeType === Node.ELEMENT_NODE,
-            );
-            const sortedLis = validLis.sort((a, b) => {
-              let left = a;
-              let right = b;
-              if (sortedColumn.order === "desc") {
-                left = b;
-                right = a;
-              }
-
-              const sortA_a = parseInt(
-                left.getAttribute("data-sortA") || "1",
-                10,
-              );
-              const sortA_b = parseInt(
-                right.getAttribute("data-sortA") || "1",
-                10,
-              );
-              const sorta = sortA_a - sortA_b;
-              if (sorta !== 0) {
-                return sorta;
-              }
-
-              const leftLocation = left.getAttribute("data-location") || "";
-              const rightLocation = right.getAttribute("data-location") || "";
-              if (leftLocation && rightLocation) {
-                if (leftLocation < rightLocation) return -1;
-                if (leftLocation > rightLocation) return 1;
-                return 0;
-              }
-
-              // Tier A (unexpected transitions): newest transition first
-              if (sortA_a === 0) {
-                const unexpectedAt_a = parseInt(
-                  left.getAttribute("data-unexpected-at") || "0",
-                  10,
-                );
-                const unexpectedAt_b = parseInt(
-                  right.getAttribute("data-unexpected-at") || "0",
-                  10,
-                );
-                return unexpectedAt_b - unexpectedAt_a;
-              }
-
-              // Tier B (stable Okay): oldest since first to preserve initial DOM order
-              if (sortA_a === 1) {
-                const since_a = parseInt(
-                  left.getAttribute("data-since") || "0",
-                  10,
-                );
-                const since_b = parseInt(
-                  right.getAttribute("data-since") || "0",
-                  10,
-                );
-                return since_a - since_b;
-              }
-
-              // Hospital timers sort until soonest first
-              const until_a = parseInt(
-                left.getAttribute("data-until") || "0",
-                10,
-              );
-              const until_b = parseInt(
-                right.getAttribute("data-until") || "0",
-                10,
-              );
-              return until_a - until_b;
-            });
-
-            let sorted = true;
-            for (let j = 0; j < sortedLis.length; j++) {
-              if (listElem.children[j] !== sortedLis[j]) {
-                sorted = false;
-                break;
-              }
-            }
-
-            if (!sorted) {
-              const fragment = document.createDocumentFragment();
-              sortedLis.forEach((li) => {
-                fragment.appendChild(li);
-              });
-              listElem.appendChild(fragment);
-            }
+            sortMemberList(memberLists[i]);
           }
+          _isSorting = false;
         }
 
         // If FF Scouter sorted our stuff but is no longer actively doing so, we should force a sort in next watch cycle
@@ -1184,6 +1174,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           if (!foundWar && descriptions.querySelector(".faction-war")) {
             foundWar = true;
             extractAllMemberLis();
+            setupMemberListObservers();
             const ids = getFactionIds();
             ids.forEach(populateCachedStatus);
             updateStatuses();
@@ -1200,6 +1191,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         if (descriptions.querySelector(".faction-war")) {
           foundWar = true;
           extractAllMemberLis();
+          setupMemberListObservers();
           const ids = getFactionIds();
           ids.forEach(populateCachedStatus);
           updateStatuses();
@@ -1270,6 +1262,8 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         if (innerDescriptionsObserver) {
           innerDescriptionsObserver.disconnect();
         }
+        for (const obs of memberListObservers) obs.disconnect();
+        memberListObservers.length = 0;
 
         // 3. Remove event listeners
         window.removeEventListener("twse-config-updated", onConfigUpdated);
