@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta13
+// @version      2.0-beta14
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -427,6 +427,11 @@ reset() {
       window.removeEventListener("popstate", delayedCallback);
       window.removeEventListener("hashchange", delayedCallback);
     };
+  }
+  function sort_by_attribute(a2, b2, attr, d2 = 0) {
+    const left = parseInt(a2.getAttribute(attr) || `${d2}`, 10);
+    const right = parseInt(b2.getAttribute(attr) || `${d2}`, 10);
+    return left - right;
   }
   const t$2 = globalThis, e$2 = t$2.ShadowRoot && (void 0 === t$2.ShadyCSS || t$2.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, s$2 = Symbol(), o$4 = new WeakMap();
   let n$3 = class n {
@@ -1910,9 +1915,8 @@ clearAll() {
               left = b2;
               right = a2;
             }
+            const sorta = sort_by_attribute(left, right, "data-sortA", 1);
             const sortA_a = parseInt(left.getAttribute("data-sortA") || "1", 10);
-            const sortA_b = parseInt(right.getAttribute("data-sortA") || "1", 10);
-            const sorta = sortA_a - sortA_b;
             if (sorta !== 0) return sorta;
             const leftLocation = left.getAttribute("data-location") || "";
             const rightLocation = right.getAttribute("data-location") || "";
@@ -1922,41 +1926,20 @@ clearAll() {
               return 0;
             }
             if (sortA_a === 0) {
-              const unexpectedAt_a = parseInt(
-                left.getAttribute("data-unexpected-at") || "0",
-                10
-              );
-              const unexpectedAt_b = parseInt(
-                right.getAttribute("data-unexpected-at") || "0",
-                10
-              );
-              return unexpectedAt_b - unexpectedAt_a;
+              return sort_by_attribute(left, right, "data-unexpected-at");
             }
             if (sortA_a === 1) {
-              const since_a = parseInt(
-                left.getAttribute("data-okay-since") || "0",
-                10
-              );
-              const since_b = parseInt(
-                right.getAttribute("data-okay-since") || "0",
-                10
-              );
-              if (since_a === since_b) {
-                const id_a = parseInt(
-                  left.getAttribute("data-player_id") || "0",
-                  10
-                );
-                const id_b = parseInt(
-                  right.getAttribute("data-player_id") || "0",
-                  10
-                );
-                return id_a - id_b;
+              const okaysince = sort_by_attribute(left, right, "data-okay-since");
+              if (okaysince === 0) {
+                const est = sort_by_attribute(left, right, "data-est-value");
+                if (est === 0) {
+                  return sort_by_attribute(left, right, "data-player_id");
+                }
+                return est * -1;
               }
-              return since_a - since_b;
+              return okaysince;
             }
-            const until_a = parseInt(left.getAttribute("data-until") || "0", 10);
-            const until_b = parseInt(right.getAttribute("data-until") || "0", 10);
-            return until_a - until_b;
+            return sort_by_attribute(left, right, "data-until");
           });
           let sorted = true;
           for (let j = 0; j < sortedLis.length; j++) {
@@ -2058,6 +2041,7 @@ clearAll() {
           deferredWrites.length = 0;
           deferredStyles.length = 0;
           let dirtySort = false;
+          const okaySince = Date.now();
           memberLis.forEach((elem, id) => {
             const li = elem.li;
             const statusDiv = elem.statusDiv;
@@ -2202,7 +2186,7 @@ clearAll() {
                   dirtySort = true;
                 }
                 if (sortAValue === "1" && !li.getAttribute("data-okay-since")) {
-                  if (queueAttrWrite(li, "data-okay-since", String(Date.now()))) {
+                  if (queueAttrWrite(li, "data-okay-since", String(okaySince))) {
                     dirtySort = true;
                   }
                 }
