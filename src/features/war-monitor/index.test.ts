@@ -28,6 +28,8 @@ class MockElement {
   public id = "";
   public className = "";
   public textContent = "";
+  public nodeType = 1; // Node.ELEMENT_NODE
+  public isConnected = true;
   public checked = false;
 
   get href() {
@@ -110,8 +112,15 @@ class MockElement {
   }
 
   appendChild(el: MockElement) {
-    el.parentNode = this;
-    this.children.push(el);
+    if (el.tagName === "FRAGMENT") {
+      for (const child of [...el.children]) {
+        child.parentNode = this;
+        this.children.push(child);
+      }
+    } else {
+      el.parentNode = this;
+      this.children.push(el);
+    }
     return el;
   }
 
@@ -162,6 +171,15 @@ class MockElement {
         (el) =>
           el.tagName === "A" &&
           (el.getAttribute("href")?.includes(match) ?? false),
+      );
+    }
+    // Handle "tag.class" compound selectors (e.g. "div.status", "ul.members-list")
+    const dotIdx = selector.indexOf(".");
+    if (dotIdx > 0) {
+      const tag = selector.slice(0, dotIdx).toUpperCase();
+      const cls = selector.slice(dotIdx + 1);
+      return this.findRecursive(
+        (el) => el.tagName === tag && el.className.includes(cls),
       );
     }
     return this.findRecursive((el) => el.tagName === selector.toUpperCase());
@@ -308,6 +326,9 @@ const documentMock = {
   createElement(tag: string) {
     return new MockElement(tag);
   },
+  createDocumentFragment() {
+    return new MockElement("fragment");
+  },
   getElementById(id: string) {
     return this.body.querySelector(`#${id}`);
   },
@@ -377,6 +398,11 @@ global.window = {
   getComputedStyle: () => ({ top: "10px" }) as any,
   getSelection: () => ({ removeAllRanges: () => {} }),
 } as any;
+
+class NodeConstructor {
+  static ELEMENT_NODE = 1;
+}
+global.Node = NodeConstructor as any;
 
 // 3. Import dynamic modules
 const { twseconfig } = await import("@utils/config");
@@ -1044,6 +1070,410 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       expect(clearSpy).toHaveBeenCalled();
       clearSpy.mockRestore();
+    });
+  });
+
+  describe("Unexpected Transition Detection and Sorting", () => {
+    const buildWarDOM = (
+      members: { id: string; statusClass: string; statusText: string }[],
+    ) => {
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+
+      const descriptions = new MockElement("div");
+      descriptions.className = "descriptions faction-war";
+
+      const ul = new MockElement("ul");
+      ul.className = "members-list";
+
+      // Faction anchor for getFactionIds()
+      const factionAnchor = new MockElement("a");
+      factionAnchor.setAttribute("href", "/factions.php?ID=999");
+      ul.appendChild(factionAnchor);
+
+      for (const m of members) {
+        const li = new MockElement("li");
+        li.className = "enemy";
+
+        const memberDiv = new MockElement("div");
+        memberDiv.className = "member";
+
+        const atag = new MockElement("a");
+        atag.setAttribute("href", `/profiles.php?ID=${m.id}`);
+        memberDiv.appendChild(atag);
+
+        const statusDiv = new MockElement("div");
+        statusDiv.className = `status ${m.statusClass}`;
+        statusDiv.textContent = m.statusText;
+
+        li.appendChild(memberDiv);
+        li.appendChild(statusDiv);
+        ul.appendChild(li);
+      }
+
+      descriptions.appendChild(ul);
+      factionWarList.appendChild(descriptions);
+      documentMock.body.appendChild(factionWarList);
+
+      global.MutationObserver = class {
+        observe = () => {};
+        disconnect = () => {};
+      } as any;
+    };
+
+    beforeEach(() => {
+      localStorage.clear();
+      documentMock.body = new MockElement("body");
+      twseconfig.war_sorting = true;
+      twseconfig.apiKey = "1234567890123456";
+      global.window.location.href = "factions.php";
+      global.window.location.hash = "#/war/123";
+    });
+
+    it("should detect Hospital→Okay unexpected transition and assign sortA=0 with highlight", async () => {
+      const { tornApi } = await import("@utils/api");
+      const futureUntil = Math.floor(Date.now() / 1000) + 300;
+
+      buildWarDOM([{ id: "1", statusClass: "ok", statusText: "Okay" }]);
+
+      // API reports member still in hospital with time remaining
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "1": {
+            name: "Alice",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Hospital",
+              description: "In the hospital",
+              until: futureUntil,
+              since: Date.now(),
+            },
+          },
+        },
+      } as any);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const li = ul?.children.find((c: any) => c.className.includes("enemy"));
+      expect(li?.getAttribute("data-sortA")).toBe("0");
+      expect(li?.getAttribute("data-unexpected-at")).not.toBe("0");
+
+      const statusDiv = li?.children.find((c: any) =>
+        c.className.includes("status"),
+      );
+      expect(statusDiv?.getAttribute("data-twse-status-differs")).toBe("true");
+
+      spy.mockRestore();
+    });
+
+    it("should detect Traveling→Okay unexpected transition and assign sortA=0 with highlight", async () => {
+      const { tornApi } = await import("@utils/api");
+
+      buildWarDOM([{ id: "2", statusClass: "ok", statusText: "Okay" }]);
+
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "2": {
+            name: "Bob",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Traveling",
+              description: "Traveling from Japan to Torn",
+              until: 0,
+              since: Date.now(),
+            },
+          },
+        },
+      } as any);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const li = ul?.children.find((c: any) => c.className.includes("enemy"));
+      expect(li?.getAttribute("data-sortA")).toBe("0");
+      expect(li?.getAttribute("data-unexpected-at")).not.toBe("0");
+
+      spy.mockRestore();
+    });
+
+    it("should NOT flag expected Hospital→Okay transition (timer expired)", async () => {
+      const { tornApi } = await import("@utils/api");
+      const pastUntil = Math.floor(Date.now() / 1000) - 10;
+
+      buildWarDOM([{ id: "3", statusClass: "ok", statusText: "Okay" }]);
+
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "3": {
+            name: "Carol",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Hospital",
+              description: "In the hospital",
+              until: pastUntil,
+              since: Date.now(),
+            },
+          },
+        },
+      } as any);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const li = ul?.children.find((c: any) => c.className.includes("enemy"));
+      // Expected exit: stays at sortA=1 (Tier B) with no unexpected flag
+      expect(li?.getAttribute("data-sortA")).toBe("1");
+      expect(li?.getAttribute("data-unexpected-at")).toBe("0");
+
+      spy.mockRestore();
+    });
+
+    it("should persist sortA=0 in default branch after API catches up to Okay", async () => {
+      const { tornApi } = await import("@utils/api");
+      const futureUntil = Math.floor(Date.now() / 1000) + 300;
+
+      buildWarDOM([{ id: "4", statusClass: "ok", statusText: "Okay" }]);
+
+      // First poll: API still says Hospital with time remaining → sets unexpectedTransitions
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "4": {
+            name: "Dave",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Hospital",
+              description: "In the hospital",
+              until: futureUntil,
+              since: Date.now(),
+            },
+          },
+        },
+      } as any);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Second poll: API has caught up, now says Okay — flag must persist
+      spy.mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "4": {
+            name: "Dave",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Okay",
+              description: "Okay",
+              until: 0,
+              since: Date.now(),
+            },
+          },
+        },
+      } as any);
+
+      await vi.advanceTimersByTimeAsync(10_000); // trigger next poll
+      await vi.advanceTimersByTimeAsync(500); // trigger watch
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const li = ul?.children.find((c: any) => c.className.includes("enemy"));
+      // Should still be sortA=0 (Tier A) — flag persists until state changes away from Okay
+      expect(li?.getAttribute("data-sortA")).toBe("0");
+
+      spy.mockRestore();
+    });
+
+    it("should clear unexpected flag and move to sortA=2 when DOM shows hospital class", async () => {
+      const { tornApi } = await import("@utils/api");
+      const futureUntil = Math.floor(Date.now() / 1000) + 300;
+
+      // Start: DOM shows Okay, API says Hospital → unexpected transition
+      buildWarDOM([{ id: "5", statusClass: "ok", statusText: "Okay" }]);
+
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "5": {
+            name: "Eve",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Hospital",
+              description: "In the hospital",
+              until: futureUntil,
+              since: Date.now(),
+            },
+          },
+        },
+      } as any);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const li = ul?.children.find((c: any) =>
+        c.className.includes("enemy"),
+      ) as any;
+      expect(li?.getAttribute("data-sortA")).toBe("0");
+
+      // Simulate DOM updating to show hospital class (member re-hospitalized)
+      const statusDiv = li?.children.find((c: any) =>
+        c.className.includes("status"),
+      ) as any;
+      statusDiv.className = "status hospital";
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Flag cleared, now sortA=2 (hospital bucket)
+      expect(li?.getAttribute("data-sortA")).toBe("2");
+      expect(li?.getAttribute("data-unexpected-at")).toBe("0");
+
+      spy.mockRestore();
+    });
+
+    it("should decay highlight after UNEXPECTED_HIGHLIGHT_MS while keeping sortA=0", async () => {
+      const { tornApi } = await import("@utils/api");
+      const futureUntil = Math.floor(Date.now() / 1000) + 300;
+
+      buildWarDOM([{ id: "6", statusClass: "ok", statusText: "Okay" }]);
+
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "6": {
+            name: "Frank",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Hospital",
+              description: "In the hospital",
+              until: futureUntil,
+              since: Date.now(),
+            },
+          },
+        },
+      } as any);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const li = ul?.children.find((c: any) => c.className.includes("enemy"));
+      const statusDiv = li?.children.find((c: any) =>
+        c.className.includes("status"),
+      ) as any;
+
+      // Within highlight window: STATUS_DIFFERS=true, sortA=0
+      expect(statusDiv?.getAttribute("data-twse-status-differs")).toBe("true");
+      expect(li?.getAttribute("data-sortA")).toBe("0");
+
+      // Advance past UNEXPECTED_HIGHLIGHT_MS (10 seconds)
+      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Highlight gone but still Tier A
+      expect(statusDiv?.getAttribute("data-twse-status-differs")).toBe("false");
+      expect(li?.getAttribute("data-sortA")).toBe("0");
+
+      spy.mockRestore();
+    });
+
+    it("should sort Tier A members newest-first and Tier B members oldest-first", async () => {
+      const { tornApi } = await import("@utils/api");
+
+      // Two members: both start Okay with no unexpected flags (Tier B)
+      buildWarDOM([
+        { id: "10", statusClass: "ok", statusText: "Okay" },
+        { id: "11", statusClass: "ok", statusText: "Okay" },
+      ]);
+
+      const baseSince = Date.now() - 5000;
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        ID: 999,
+        name: "F",
+        tag: "F",
+        members: {
+          "10": {
+            name: "Alice",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Okay",
+              description: "Okay",
+              until: 0,
+              since: baseSince,
+            },
+          },
+          "11": {
+            name: "Bob",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Okay",
+              description: "Okay",
+              until: 0,
+              since: baseSince + 1000,
+            },
+          },
+        },
+      } as any);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const lis = ul?.children.filter((c: any) =>
+        c.className.includes("enemy"),
+      ) as any[];
+
+      // Tier B ascending since: member 10 (older since) should be first
+      expect(
+        lis[0]?.querySelector("a[href^='/profiles.php']")?.getAttribute("href"),
+      ).toContain("ID=10");
+      expect(
+        lis[1]?.querySelector("a[href^='/profiles.php']")?.getAttribute("href"),
+      ).toContain("ID=11");
+
+      spy.mockRestore();
     });
   });
 

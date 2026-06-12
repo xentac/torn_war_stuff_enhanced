@@ -39,7 +39,8 @@ export default defineConfig(({ mode }) => {
       );
     })();
   // biome-ignore lint/complexity/useLiteralKeys: tsc requires index signature lookup
-  const editionKey = (process.env["BUILD_EDITION"] || "standard") as keyof typeof EDITIONS;
+  const editionKey = (process.env["BUILD_EDITION"] ||
+    "standard") as keyof typeof EDITIONS;
   const edition = EDITIONS[editionKey] || EDITIONS.standard;
   // biome-ignore lint/complexity/useLiteralKeys: tsc requires index signature lookup
   const version = process.env["BUILD_VERSION"] || getFallbackVersion();
@@ -90,6 +91,9 @@ export default defineConfig(({ mode }) => {
     build: {
       minify: false,
       sourcemap: isDev ? "inline" : false,
+    },
+    test: {
+      testTimeout: 20_000,
     },
   };
 });

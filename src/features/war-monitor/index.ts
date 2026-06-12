@@ -96,8 +96,11 @@ const WarMonitorFeature: Feature = {
 
       const memberStatus = new Map<string, FactionMemberStatus>();
       const memberLis = new Map<string, MemberLiRef>();
+      const unexpectedTransitions = new Map<string, number>();
       const deferredWrites: [Element, string, string][] = [];
       const deferredStyles: [HTMLElement, string, string][] = [];
+
+      const UNEXPECTED_HIGHLIGHT_MS = 10_000;
 
       let lastRequestTime = 0;
       const minTimeBetweenRequestsMs = 10_000;
@@ -123,6 +126,7 @@ const WarMonitorFeature: Feature = {
         memberStatus.clear();
         factionCache.clearAll();
         activeChains.clear();
+        unexpectedTransitions.clear();
         updateStatuses();
       };
       window.addEventListener("twse-clear-cache", onClearCache);
@@ -523,6 +527,7 @@ const WarMonitorFeature: Feature = {
         "data-since",
         "data-sortA",
         "data-location",
+        "data-unexpected-at",
         "data-twse-traveling",
         "data-twse-highlight",
         "data-twse-status-differs",
@@ -706,7 +711,10 @@ const WarMonitorFeature: Feature = {
                 statusDiv.classList.contains("abroad");
               if (!hasTravelingClass) {
                 if (statusDiv.textContent === "Okay") {
-                  queueAttrWrite(statusDiv, STATUS_DIFFERS, "true");
+                  // Unexpected transition: DOM shows Okay but API snapshot says traveling
+                  if (!unexpectedTransitions.has(id)) {
+                    unexpectedTransitions.set(id, Date.now());
+                  }
                   if (queueAttrWrite(li, "data-sortA", "0")) {
                     dirtySort = true;
                   }
@@ -715,7 +723,8 @@ const WarMonitorFeature: Feature = {
                 break;
               }
 
-              queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
+              // DOM confirms traveling — clear any unexpected transition flag
+              unexpectedTransitions.delete(id);
               queueAttrWrite(statusDiv, "data-twse-overridden", "true");
 
               if (status.description.includes("In ")) {
@@ -781,10 +790,18 @@ const WarMonitorFeature: Feature = {
                 statusDiv.classList.contains("jail");
               if (!hasHospitalClass) {
                 if (timeRemaining >= 0) {
+                  // Unexpected transition: DOM shows Okay but API snapshot has time remaining
+                  if (!unexpectedTransitions.has(id)) {
+                    unexpectedTransitions.set(id, Date.now());
+                  }
                   if (queueAttrWrite(li, "data-sortA", "0")) {
                     dirtySort = true;
                   }
-                  queueAttrWrite(statusDiv, STATUS_DIFFERS, "true");
+                } else {
+                  // Expected exit: timer expired, DOM confirms Okay → Tier B
+                  if (queueAttrWrite(li, "data-sortA", "1")) {
+                    dirtySort = true;
+                  }
                 }
                 queueAttrWrite(statusDiv, TRAVELING, "false");
                 queueAttrWrite(statusDiv, HIGHLIGHT, "false");
@@ -792,7 +809,8 @@ const WarMonitorFeature: Feature = {
                 break;
               }
 
-              queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
+              // DOM confirms hospital/jail — clear any unexpected transition flag
+              unexpectedTransitions.delete(id);
               if (queueAttrWrite(li, "data-sortA", "2")) {
                 dirtySort = true;
               }
@@ -821,21 +839,40 @@ const WarMonitorFeature: Feature = {
               break;
             }
 
-            default:
-              if (queueAttrWrite(li, "data-sortA", "1")) {
+            default: {
+              // Tier A: API has caught up but member had an unexpected transition this session
+              // Tier B: stable Okay with no unexpected transition
+              const sortAValue = unexpectedTransitions.has(id) ? "0" : "1";
+              if (queueAttrWrite(li, "data-sortA", sortAValue)) {
                 dirtySort = true;
               }
               queueAttrWrite(statusDiv, TRAVELING, "false");
               queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-              queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
               queueAttrWrite(statusDiv, "data-twse-overridden", "false");
               break;
+            }
           }
 
           if (li.getAttribute("data-location") !== dataLocation) {
             queueAttrWrite(li, "data-location", dataLocation);
             dirtySort = true;
           }
+
+          // Persist unexpected transition timestamp as a sort key on the element
+          const unexpectedAt = unexpectedTransitions.get(id) ?? 0;
+          if (queueAttrWrite(li, "data-unexpected-at", String(unexpectedAt))) {
+            dirtySort = true;
+          }
+
+          // Highlight decays after UNEXPECTED_HIGHLIGHT_MS regardless of API state
+          const isHighlighted =
+            unexpectedAt > 0 &&
+            Date.now() - unexpectedAt < UNEXPECTED_HIGHLIGHT_MS;
+          queueAttrWrite(
+            statusDiv,
+            STATUS_DIFFERS,
+            isHighlighted ? "true" : "false",
+          );
         });
 
         // Commit all writes at once
@@ -909,8 +946,21 @@ const WarMonitorFeature: Feature = {
                 return 0;
               }
 
-              // Differs and Okay status sorts since oldest first
-              if (sortA_a === 0 || sortA_a === 1) {
+              // Tier A (unexpected transitions): newest transition first
+              if (sortA_a === 0) {
+                const unexpectedAt_a = parseInt(
+                  left.getAttribute("data-unexpected-at") || "0",
+                  10,
+                );
+                const unexpectedAt_b = parseInt(
+                  right.getAttribute("data-unexpected-at") || "0",
+                  10,
+                );
+                return unexpectedAt_b - unexpectedAt_a;
+              }
+
+              // Tier B (stable Okay): oldest since first to preserve initial DOM order
+              if (sortA_a === 1) {
                 const since_a = parseInt(
                   left.getAttribute("data-since") || "0",
                   10,
@@ -919,7 +969,7 @@ const WarMonitorFeature: Feature = {
                   right.getAttribute("data-since") || "0",
                   10,
                 );
-                return since_b - since_a;
+                return since_a - since_b;
               }
 
               // Hospital timers sort until soonest first
