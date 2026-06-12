@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta10
+// @version      2.0-beta11
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1479,6 +1479,12 @@ clearAll() {
     name: "War Monitor",
     description: "Monitors active Faction wars, retrieves real-time member statuses, and decorates rows",
     executionTime: StartTime.DocumentEnd,
+    intervals: {
+      poll: 1e4,
+      watch: 500,
+      minTimeBetweenRequests: 1e4,
+      unexpectedHighlight: 1e4
+    },
     shouldRun() {
       return window.location.href.includes("factions.php");
     },
@@ -1507,10 +1513,12 @@ clearAll() {
         let ffscouterSortingDeferred = false;
         const memberStatus = new Map();
         const memberLis = new Map();
+        const unexpectedTransitions = new Map();
         const deferredWrites = [];
         const deferredStyles = [];
+        const UNEXPECTED_HIGHLIGHT_MS = WarMonitorFeature.intervals.unexpectedHighlight;
         let lastRequestTime = 0;
-        const minTimeBetweenRequestsMs = 1e4;
+        const minTimeBetweenRequestsMs = WarMonitorFeature.intervals.minTimeBetweenRequests;
         const activeChains = new Map();
         let lastChainHtml = "";
         let isDragging = false;
@@ -1529,6 +1537,7 @@ clearAll() {
           memberStatus.clear();
           factionCache.clearAll();
           activeChains.clear();
+          unexpectedTransitions.clear();
           updateStatuses();
         };
         window.addEventListener("twse-clear-cache", onClearCache);
@@ -1830,6 +1839,7 @@ clearAll() {
           "data-since",
           "data-sortA",
           "data-location",
+          "data-unexpected-at",
           "data-twse-traveling",
           "data-twse-highlight",
           "data-twse-status-differs",
@@ -1973,7 +1983,9 @@ clearAll() {
                 const hasTravelingClass = statusDiv.classList.contains("traveling") || statusDiv.classList.contains("abroad");
                 if (!hasTravelingClass) {
                   if (statusDiv.textContent === "Okay") {
-                    queueAttrWrite(statusDiv, STATUS_DIFFERS, "true");
+                    if (!unexpectedTransitions.has(id)) {
+                      unexpectedTransitions.set(id, Date.now());
+                    }
                     if (queueAttrWrite(li, "data-sortA", "0")) {
                       dirtySort = true;
                     }
@@ -1981,7 +1993,7 @@ clearAll() {
                   queueAttrWrite(statusDiv, "data-twse-overridden", "false");
                   break;
                 }
-                queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
+                unexpectedTransitions.delete(id);
                 queueAttrWrite(statusDiv, "data-twse-overridden", "true");
                 if (status.description.includes("In ")) {
                   if (queueAttrWrite(li, "data-sortA", "4")) {
@@ -2041,17 +2053,23 @@ clearAll() {
                 const hasHospitalClass = statusDiv.classList.contains("hospital") || statusDiv.classList.contains("jail");
                 if (!hasHospitalClass) {
                   if (timeRemaining >= 0) {
+                    if (!unexpectedTransitions.has(id)) {
+                      unexpectedTransitions.set(id, Date.now());
+                    }
                     if (queueAttrWrite(li, "data-sortA", "0")) {
                       dirtySort = true;
                     }
-                    queueAttrWrite(statusDiv, STATUS_DIFFERS, "true");
+                  } else {
+                    if (queueAttrWrite(li, "data-sortA", "1")) {
+                      dirtySort = true;
+                    }
                   }
                   queueAttrWrite(statusDiv, TRAVELING, "false");
                   queueAttrWrite(statusDiv, HIGHLIGHT, "false");
                   queueAttrWrite(statusDiv, "data-twse-overridden", "false");
                   break;
                 }
-                queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
+                unexpectedTransitions.delete(id);
                 if (queueAttrWrite(li, "data-sortA", "2")) {
                   dirtySort = true;
                 }
@@ -2075,20 +2093,31 @@ clearAll() {
                 }
                 break;
               }
-              default:
-                if (queueAttrWrite(li, "data-sortA", "1")) {
+              default: {
+                const sortAValue = unexpectedTransitions.has(id) ? "0" : "1";
+                if (queueAttrWrite(li, "data-sortA", sortAValue)) {
                   dirtySort = true;
                 }
                 queueAttrWrite(statusDiv, TRAVELING, "false");
                 queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-                queueAttrWrite(statusDiv, STATUS_DIFFERS, "false");
                 queueAttrWrite(statusDiv, "data-twse-overridden", "false");
                 break;
+              }
             }
             if (li.getAttribute("data-location") !== dataLocation) {
               queueAttrWrite(li, "data-location", dataLocation);
               dirtySort = true;
             }
+            const unexpectedAt = unexpectedTransitions.get(id) ?? 0;
+            if (queueAttrWrite(li, "data-unexpected-at", String(unexpectedAt))) {
+              dirtySort = true;
+            }
+            const isHighlighted = unexpectedAt > 0 && Date.now() - unexpectedAt < UNEXPECTED_HIGHLIGHT_MS;
+            queueAttrWrite(
+              statusDiv,
+              STATUS_DIFFERS,
+              isHighlighted ? "true" : "false"
+            );
           });
           if (deferredWrites.length > 0) {
             for (const [elem, attr, val] of deferredWrites) {
@@ -2147,7 +2176,18 @@ clearAll() {
                   if (leftLocation > rightLocation) return 1;
                   return 0;
                 }
-                if (sortA_a === 0 || sortA_a === 1) {
+                if (sortA_a === 0) {
+                  const unexpectedAt_a = parseInt(
+                    left.getAttribute("data-unexpected-at") || "0",
+                    10
+                  );
+                  const unexpectedAt_b = parseInt(
+                    right.getAttribute("data-unexpected-at") || "0",
+                    10
+                  );
+                  return unexpectedAt_b - unexpectedAt_a;
+                }
+                if (sortA_a === 1) {
                   const since_a = parseInt(
                     left.getAttribute("data-since") || "0",
                     10
@@ -2156,7 +2196,7 @@ clearAll() {
                     right.getAttribute("data-since") || "0",
                     10
                   );
-                  return since_b - since_a;
+                  return since_a - since_b;
                 }
                 const until_a = parseInt(
                   left.getAttribute("data-until") || "0",
@@ -2360,12 +2400,12 @@ clearAll() {
           if (running && foundWar) {
             updateStatuses();
           }
-        }, 1e4);
+        }, WarMonitorFeature.intervals.poll);
         const watchInterval = setInterval(() => {
           if (foundWar && running && pageVisible) {
             watch();
           }
-        }, 500);
+        }, WarMonitorFeature.intervals.watch);
         stopMonitor = () => {
           active = false;
           running = false;
