@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta12
+// @version      2.0-beta13
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1838,7 +1838,7 @@ clearAll() {
         const styleCache = new WeakMap();
         const cacheableAttrs = new Set([
           "data-until",
-          "data-since",
+          "data-okay-since",
           "data-sortA",
           "data-location",
           "data-unexpected-at",
@@ -1934,11 +1934,11 @@ clearAll() {
             }
             if (sortA_a === 1) {
               const since_a = parseInt(
-                left.getAttribute("data-since") || "0",
+                left.getAttribute("data-okay-since") || "0",
                 10
               );
               const since_b = parseInt(
-                right.getAttribute("data-since") || "0",
+                right.getAttribute("data-okay-since") || "0",
                 10
               );
               if (since_a === since_b) {
@@ -2036,14 +2036,6 @@ clearAll() {
             for (const [id, memberData] of Object.entries(data.members)) {
               const status = memberData.status;
               status.last_req_time = reqTime;
-              const prev = memberStatus.get(id);
-              const prev_state = prev?.state ?? "Unknown";
-              const prev_since = prev?.since ?? reqTime;
-              if (prev_state === status.state) {
-                status.since = prev_since;
-              } else {
-                status.since = reqTime;
-              }
               memberStatus.set(id, status);
               factionStatus[id] = status;
             }
@@ -2078,9 +2070,6 @@ clearAll() {
             if (queueAttrWrite(li, "data-until", String(status.until))) {
               dirtySort = true;
             }
-            if (queueAttrWrite(li, "data-since", String(status.since))) {
-              dirtySort = true;
-            }
             if (queueAttrWrite(li, "data-player_id", String(id))) {
               dirtySort = true;
             }
@@ -2102,6 +2091,7 @@ clearAll() {
                   break;
                 }
                 unexpectedTransitions.delete(id);
+                queueAttrWrite(li, "data-okay-since", "");
                 queueAttrWrite(statusDiv, "data-twse-overridden", "true");
                 if (status.description.includes("In ")) {
                   if (queueAttrWrite(li, "data-sortA", "4")) {
@@ -2168,6 +2158,10 @@ clearAll() {
                       dirtySort = true;
                     }
                   } else {
+                    unexpectedTransitions.delete(id);
+                    if (queueAttrWrite(li, "data-okay-since", `${status.until}000`)) {
+                      dirtySort = true;
+                    }
                     if (queueAttrWrite(li, "data-sortA", "1")) {
                       dirtySort = true;
                     }
@@ -2178,6 +2172,7 @@ clearAll() {
                   break;
                 }
                 unexpectedTransitions.delete(id);
+                queueAttrWrite(li, "data-okay-since", "");
                 if (queueAttrWrite(li, "data-sortA", "2")) {
                   dirtySort = true;
                 }
@@ -2205,6 +2200,11 @@ clearAll() {
                 const sortAValue = unexpectedTransitions.has(id) ? "0" : "1";
                 if (queueAttrWrite(li, "data-sortA", sortAValue)) {
                   dirtySort = true;
+                }
+                if (sortAValue === "1" && !li.getAttribute("data-okay-since")) {
+                  if (queueAttrWrite(li, "data-okay-since", String(Date.now()))) {
+                    dirtySort = true;
+                  }
                 }
                 queueAttrWrite(statusDiv, TRAVELING, "false");
                 queueAttrWrite(statusDiv, HIGHLIGHT, "false");
