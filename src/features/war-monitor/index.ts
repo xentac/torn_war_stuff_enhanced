@@ -652,7 +652,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           // Tier A (unexpected transitions): newest transition first
           if (sortA_a === 0) {
-            return sort_by_attribute(left, right, "data-unexpected-at");
+            return sort_by_attribute(left, right, "data-unexpected-at") * -1; // Sort unexpected-at most recent the highest
           }
 
           // Tier B: oldest okay-since first; expected exits land at bottom ordered by expiry time
