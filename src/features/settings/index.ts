@@ -66,13 +66,21 @@ const SettingsFeature: Feature = {
       window.dispatchEvent(new CustomEvent("twse-config-updated"));
     });
 
-    // 6. Set up event listener for Clear Cache
+    // 6. Set up event listener for API key auto-save
+    panel.addEventListener("twse-save-key", (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      twseconfig.apiKey = detail.apiKey;
+      log.info("API key saved");
+      window.dispatchEvent(new CustomEvent("twse-config-updated"));
+    });
+
+    // 7. Set up event listener for Clear Cache
     panel.addEventListener("twse-clear-cache", () => {
       log.info("Settings cleared caching successfully");
       window.dispatchEvent(new CustomEvent("twse-clear-cache"));
     });
 
-    // 7. Append panel inside #factions container (at the bottom)
+    // 8. Append panel inside #factions container (at the bottom)
     factionsContainer.appendChild(panel);
     log.debug("Settings panel successfully appended to #factions container");
   },

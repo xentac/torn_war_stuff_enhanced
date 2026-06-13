@@ -94,8 +94,20 @@ export class TWSESettingsPanel extends LitElement {
   }
 
   private onKeyInput(e: Event) {
-    this.draftApiKey = (e.target as HTMLInputElement).value.trim();
+    this.draftApiKey = (e.target as HTMLInputElement).value;
     this.showSavedMessage = false;
+  }
+
+  private onKeyChange(e: Event) {
+    const val = (e.target as HTMLInputElement).value.trim();
+    this.draftApiKey = val;
+    this.dispatchEvent(
+      new CustomEvent("twse-save-key", {
+        detail: { apiKey: val },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private onWarSortingChange(e: Event) {
@@ -137,6 +149,7 @@ export class TWSESettingsPanel extends LitElement {
               maxlength="16"
               .value=${this.draftApiKey}
               @input=${this.onKeyInput}
+              @change=${this.onKeyChange}
             />
             <div class="twse-api-explanation">
               <strong>Info:</strong> Provide a valid 16-character public API key to pull faction war information and real-time member statuses.
