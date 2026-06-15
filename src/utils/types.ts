@@ -2,13 +2,24 @@ export type TimestampMs = number;
 export type TimestampSec = number;
 
 export interface FactionMemberStatus {
-  state: "Okay" | "Traveling" | "Hospital" | "Jail" | "Abroad" | "Unknown";
+  state:
+    | "Okay"
+    | "Traveling"
+    | "Hospital"
+    | "Jail"
+    | "Abroad"
+    | "Awoken"
+    | "Dormant"
+    | "Fallen"
+    | "Federal"
+    | "Unknown";
   description: string;
-  until: TimestampSec;
+  until: TimestampSec | null;
   last_req_time?: TimestampMs;
 }
 
 export interface FactionMember {
+  id: number;
   name: string;
   level: number;
   last_action: {
@@ -23,16 +34,14 @@ export interface FactionChain {
   max: number;
   timeout: number;
   modifier: number;
-  cooldown: number;
-  end?: number;
+  cooldown: TimestampSec; // v2: Unix timestamp of when cooldown ends (not seconds remaining)
+  end?: TimestampSec;
 }
 
 export interface FactionResponse {
-  ID: number;
-  name: string;
-  tag: string;
-  members?: Record<string, FactionMember>;
+  members?: FactionMember[];
   chain?: FactionChain;
+  timestamp?: TimestampSec;
   error?: {
     code: number;
     error: string;

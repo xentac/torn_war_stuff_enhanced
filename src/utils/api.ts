@@ -5,11 +5,11 @@ import type { FactionResponse } from "./types";
 const log = logger.child("api");
 
 export class TornApiClient {
-  private baseUrl = "https://api.torn.com/faction/";
+  private baseUrl = "https://api.torn.com/v2/faction";
 
   /**
-   * Fetches faction member list status and chain details from the Torn API.
-   * Requests both 'basic' and 'chain' selections.
+   * Fetches faction member list status and chain details from the Torn API v2.
+   * Requests 'members', 'chain', and 'timestamp' selections.
    */
   public async fetchFactionData(
     factionId: string,
@@ -24,22 +24,26 @@ export class TornApiClient {
       return null;
     }
 
-    const url = `${this.baseUrl}${factionId}?selections=basic,chain&key=${key}&comment=TornWarStuffEnhanced`;
+    const url = `${this.baseUrl}?id=${factionId}&selections=members,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced`;
 
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`HTTP Error status: ${response.status}`);
+        try {
+          const errData = (await response.json()) as {
+            code: number;
+            error: string;
+          };
+          log.error(
+            `Torn API returned error code ${errData.code}: ${errData.error}`,
+          );
+          return { error: errData };
+        } catch {
+          throw new Error(`HTTP Error status: ${response.status}`);
+        }
       }
 
       const data = (await response.json()) as FactionResponse;
-      if (data.error) {
-        log.error(
-          `Torn API returned error code ${data.error.code}: ${data.error.error}`,
-        );
-        return data; // Return the response containing the error object so caller can handle rate limits / bad keys
-      }
-
       return data;
     } catch (e) {
       log.error(

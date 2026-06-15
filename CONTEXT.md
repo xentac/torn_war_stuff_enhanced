@@ -37,3 +37,11 @@ _Avoid_: Flag, badge, status-differs highlight
 
 **Near-expiry highlight**: The green row background (`data-twse-highlight="true"`) applied to a hospitalized member whose timer is under 5 minutes. Indicates imminent return to Okay.
 _Avoid_: Hospital highlight, green highlight
+
+### External service
+
+**TWSE Server** (full name: Torn War Stuff Enhanced Server): An external service that aggregates raw Torn API v2 responses contributed by all script users. Any user can query it for a fresher snapshot than their own poll interval would provide — because another user may have called the Torn API more recently. Write path: fire-and-forget POST after each poll, non-blocking. Read path: query before (or instead of) calling Torn directly; a distinct future concern not yet implemented.
+_Avoid_: Collection service, community cache, cache service, API proxy
+
+**Server timestamp**: The `timestamp` field returned by the Torn API v2 `timestamp` selection — a Unix timestamp (seconds) representing when the Torn server generated the response snapshot. The authoritative freshness signal in the community cache: when multiple users have contributed responses, the one with the highest server timestamp is the most recent, regardless of which user contributed it or when.
+_Avoid_: API timestamp, request timestamp, response time, client timestamp

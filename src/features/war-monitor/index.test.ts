@@ -680,10 +680,7 @@ describe("WarMonitorFeature Sorting Config", () => {
     };
 
     const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-      ID: 999,
-      name: "Test Faction",
-      tag: "TST",
-      members: {},
+      members: [],
       chain: mockChainData,
     });
 
@@ -727,7 +724,6 @@ describe("WarMonitorFeature Sorting Config", () => {
     await vi.advanceTimersByTimeAsync(500);
 
     expect(spy).toHaveBeenCalledWith("999");
-    expect(bubble.innerHTML).toContain("[TST]");
     expect(bubble.innerHTML).toContain("42/100");
     expect(bubble.innerHTML).toContain("1.50x");
     expect(bubble.innerHTML).toMatch(/1:59|2:00/);
@@ -814,10 +810,7 @@ describe("WarMonitorFeature Sorting Config", () => {
     twseconfig.apiKey = "1234567890123456";
 
     const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-      ID: 999,
-      name: "Test Faction",
-      tag: "TST",
-      members: {},
+      members: [],
       chain: {
         current: 42,
         max: 100,
@@ -899,10 +892,7 @@ describe("WarMonitorFeature Sorting Config", () => {
     twseconfig.apiKey = "1234567890123456";
 
     const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-      ID: 999,
-      name: "Test Faction",
-      tag: "TST",
-      members: {},
+      members: [],
       chain: {
         current: 42,
         max: 100,
@@ -1011,16 +1001,14 @@ describe("WarMonitorFeature Sorting Config", () => {
 
     // Mock Faction Data responses
     const mockData1 = {
-      ID: 1234,
-      name: "Test Faction",
-      tag: "TF",
-      members: {},
+      members: [],
       chain: {
         current: 50,
         max: 100,
         timeout: 300,
         modifier: 2.5,
-        cooldown: 120, // cooldown active!
+        // v2: Unix timestamp when cooldown ends (~2 minutes from now)
+        cooldown: Math.floor(Date.now() / 1000) + 120,
         get end() {
           return Date.now() / 1000 + this.timeout;
         },
@@ -1028,10 +1016,7 @@ describe("WarMonitorFeature Sorting Config", () => {
     };
 
     const mockData2 = {
-      ID: 1234,
-      name: "Test Faction 2",
-      tag: "TF2",
-      members: {},
+      members: [],
       chain: {
         current: 0,
         max: 10,
@@ -1076,8 +1061,8 @@ describe("WarMonitorFeature Sorting Config", () => {
     // Verify cooldown (broken) chain rendering
     expect(bubble.innerHTML).toContain("twse-chain-count cooldown");
     expect(bubble.innerHTML).toContain("twse-chain-timer cooldown");
-    // Cooldown is 120 seconds, so it formats to 2:00 or 1:59 depending on exact tick
-    expect(bubble.innerHTML).toMatch(/1:59|2:00/);
+    // Cooldown is ~120 seconds; allow 1:58–2:00 to tolerate float rounding + timer advance
+    expect(bubble.innerHTML).toMatch(/1:5[89]|2:00/);
 
     // Now switch mock to non-existent chain
     spy.mockRestore();
@@ -1220,11 +1205,9 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       // API reports member still in hospital with time remaining
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "1": {
+        members: [
+          {
+            id: 1,
             name: "Alice",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1234,8 +1217,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: futureUntil,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       vi.useFakeTimers();
       WarMonitorFeature.run();
@@ -1261,11 +1244,9 @@ describe("WarMonitorFeature Sorting Config", () => {
       buildWarDOM([{ id: "2", statusClass: "ok", statusText: "Okay" }]);
 
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "2": {
+        members: [
+          {
+            id: 2,
             name: "Bob",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1275,8 +1256,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: 0,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       vi.useFakeTimers();
       WarMonitorFeature.run();
@@ -1298,11 +1279,9 @@ describe("WarMonitorFeature Sorting Config", () => {
       buildWarDOM([{ id: "3", statusClass: "ok", statusText: "Okay" }]);
 
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "3": {
+        members: [
+          {
+            id: 3,
             name: "Carol",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1312,8 +1291,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: pastUntil,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       vi.useFakeTimers();
       WarMonitorFeature.run();
@@ -1341,11 +1320,9 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       // First poll: API still says Hospital with time remaining → sets unexpectedTransitions
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "4": {
+        members: [
+          {
+            id: 4,
             name: "Dave",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1355,8 +1332,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: futureUntil,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       vi.useFakeTimers();
       WarMonitorFeature.run();
@@ -1365,11 +1342,9 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       // Second poll: API has caught up, now says Okay — flag must persist
       spy.mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "4": {
+        members: [
+          {
+            id: 4,
             name: "Dave",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1379,8 +1354,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: 0,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       await vi.advanceTimersByTimeAsync(100); // trigger next poll
       await vi.advanceTimersByTimeAsync(50); // trigger watch
@@ -1401,11 +1376,9 @@ describe("WarMonitorFeature Sorting Config", () => {
       buildWarDOM([{ id: "5", statusClass: "ok", statusText: "Okay" }]);
 
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "5": {
+        members: [
+          {
+            id: 5,
             name: "Eve",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1415,8 +1388,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: futureUntil,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       vi.useFakeTimers();
       WarMonitorFeature.run();
@@ -1454,11 +1427,9 @@ describe("WarMonitorFeature Sorting Config", () => {
       buildWarDOM([{ id: "6", statusClass: "ok", statusText: "Okay" }]);
 
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "6": {
+        members: [
+          {
+            id: 6,
             name: "Frank",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1468,8 +1439,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: futureUntil,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       vi.useFakeTimers();
       WarMonitorFeature.run();
@@ -1507,11 +1478,9 @@ describe("WarMonitorFeature Sorting Config", () => {
       ]);
 
       const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
-        ID: 999,
-        name: "F",
-        tag: "F",
-        members: {
-          "10": {
+        members: [
+          {
+            id: 10,
             name: "Alice",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1521,7 +1490,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: 0,
             },
           },
-          "11": {
+          {
+            id: 11,
             name: "Bob",
             level: 10,
             last_action: { status: "", timestamp: 0 },
@@ -1531,8 +1501,8 @@ describe("WarMonitorFeature Sorting Config", () => {
               until: 0,
             },
           },
-        },
-      } as any);
+        ],
+      });
 
       vi.useFakeTimers();
       WarMonitorFeature.run();

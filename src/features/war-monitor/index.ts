@@ -34,7 +34,6 @@ interface ActiveChainState {
   max: number;
   timeout: number;
   modifier: number;
-  tag: string;
   apiReceivedAt: number;
   cooldown: number;
   end?: number;
@@ -770,20 +769,21 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             continue;
           }
 
-          if (!data.members) continue;
+          if (data.members) {
+            const reqTime = Date.now();
+            const factionStatus: Record<string, FactionMemberStatus> = {};
 
-          const reqTime = Date.now();
-          const factionStatus: Record<string, FactionMemberStatus> = {};
+            for (const memberData of data.members) {
+              const id = String(memberData.id);
+              const status = memberData.status;
+              status.last_req_time = reqTime;
 
-          for (const [id, memberData] of Object.entries(data.members)) {
-            const status = memberData.status;
-            status.last_req_time = reqTime;
+              memberStatus.set(id, status);
+              factionStatus[id] = status;
+            }
 
-            memberStatus.set(id, status);
-            factionStatus[id] = status;
+            factionCache.set(factionId, factionStatus);
           }
-
-          factionCache.set(factionId, factionStatus);
 
           if (data.chain) {
             activeChains.set(factionId, {
@@ -791,7 +791,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
               max: data.chain.max,
               timeout: data.chain.timeout,
               modifier: data.chain.modifier,
-              tag: data.tag || "",
               apiReceivedAt: getCurrentTimeSec(),
               cooldown: data.chain.cooldown || 0,
               end: data.chain.end,
@@ -819,7 +818,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             return;
           }
 
-          if (queueAttrWrite(li, "data-until", String(status.until))) {
+          if (queueAttrWrite(li, "data-until", String(status.until ?? 0))) {
             dirtySort = true;
           }
           if (queueAttrWrite(li, "data-player_id", String(id))) {
@@ -909,7 +908,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             case "Hospital":
             case "Jail": {
               const now = getCurrentTimeSec();
-              const timeRemaining = Math.round(status.until - now);
+              const timeRemaining = Math.round((status.until ?? 0) - now);
 
               const hasHospitalClass =
                 statusDiv.classList.contains("hospital") ||
@@ -931,7 +930,11 @@ const WarMonitorFeature: WarMonitorFeatureType = {
                   // Set sort epoch to hospital expiry time so earlier-expiring members sort above
                   // later-expiring ones; stable across subsequent polls unlike raw API data
                   if (
-                    queueAttrWrite(li, "data-okay-since", `${status.until}000`)
+                    queueAttrWrite(
+                      li,
+                      "data-okay-since",
+                      String((status.until ?? 0) * 1000),
+                    )
                   ) {
                     dirtySort = true;
                   }
@@ -1092,35 +1095,32 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           let countClass = "";
 
           if (chain.cooldown > 0) {
-            // 1. Cooldown state (Broken chain)
-            const elapsed = now - chain.apiReceivedAt;
-            const remainingCooldown = Math.max(0, chain.cooldown - elapsed);
+            // 1. Cooldown state (Broken chain); cooldown is a Unix timestamp in v2
+            const remainingCooldown = Math.max(0, chain.cooldown - now);
             formattedTime = formatChainCooldown(remainingCooldown);
             timerClass = "cooldown";
             countClass = "cooldown";
-          } else if (chain.timeout === 0) {
+          } else if (chain.current === 0 || !chain.end || chain.end === 0) {
             // 2. Non-existent/not running chain state
             formattedTime = "-:--";
             timerClass = "okay"; // Default standard okay color
           } else {
-            // 3. Active running chain countdown
-            const elapsed = now - chain.apiReceivedAt;
-            const remaining =
-              chain.end && chain.end > 0
-                ? chain.end - now
-                : chain.timeout - elapsed;
-            formattedTime = formatChainTimeout(remaining);
+            // 3. Active running chain countdown (never use timeout; server strips it)
+            const remaining = chain.end - now;
 
             if (remaining < 0) {
+              formattedTime = formatChainTimeout(remaining);
               timerClass = "negative";
             } else if (remaining < 60) {
+              formattedTime = formatChainTimeout(remaining);
               timerClass = "urgent";
+            } else {
+              formattedTime = formatChainTimeout(remaining);
             }
           }
 
           html += `
             <div class="twse-chain-row">
-              <span class="twse-chain-tag">[${chain.tag || "Faction"}]</span>
               <div class="twse-chain-stats">
                 <span class="twse-chain-count ${countClass}">${chain.current}/${chain.max}</span>
                 <span class="twse-chain-mult">${chain.modifier.toFixed(2)}x</span>
