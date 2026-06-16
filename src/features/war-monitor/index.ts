@@ -88,6 +88,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
     let active = false;
     let stopMonitor: (() => void) | null = null;
 
+    const isVisible = () => {
+      return !document.hidden && !document.hasFocus();
+    };
+
     const startMonitor = async () => {
       if (active) return;
       active = true;
@@ -111,7 +115,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       let running = true;
       let foundWar = false;
-      let pageVisible = !document.hidden;
+      let pageVisible = isVisible();
       let everSorted = false;
       let ffscouterSortingDeferred = false;
 
@@ -359,7 +363,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       // Listen for visibility updates
       const onVisibilityChange = () => {
-        pageVisible = !document.hidden;
+        pageVisible = isVisible();
       };
       document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -1262,6 +1266,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       // Set countdown draw timers (updates clock draw variables every 500ms)
       const watchInterval = setInterval(() => {
+        pageVisible = isVisible();
         if (foundWar && running && pageVisible) {
           watch();
         }
