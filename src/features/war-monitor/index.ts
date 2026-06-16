@@ -138,7 +138,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       const activeChains = new Map<string, ActiveChainState>();
       const lastAppliedTimestamp = new Map<FactionId, number>();
-      let cachedPlayerId: number | null = null;
+      const sseUnsubscribers: (() => void)[] = [];
       let cachedUserIdHashKey: string | null = null;
       let cachedUserIdHash: string | null = null;
       let lastChainHtml = "";
@@ -752,16 +752,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         return " LATE";
       }
 
-      // Returns the current user's player ID from the nav settings menu profile link.
-      function getPlayerIdFromDom(): number | null {
-        const link = document.querySelector<HTMLAnchorElement>(
-          'ul.settings-menu a[href*="profiles.php?XID="]',
-        );
-        if (!link) return null;
-        const match = link.href.match(/profiles\.php\?XID=(\d+)/);
-        return match ? parseInt(match[1], 10) : null;
-      }
-
       // Returns SHA-256(apiKey) as a hex string, cached per key value.
       async function getUserIdHash(): Promise<string | null> {
         const key = twseconfig.apiKey;
@@ -829,7 +819,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         if (now - lastRequestTime < minTimeBetweenRequestsMs) return;
         lastRequestTime = now;
 
-        if (cachedPlayerId === null) cachedPlayerId = getPlayerIdFromDom();
         const userIdHash = await getUserIdHash();
 
         for (const factionId of factionIds) {
@@ -850,12 +839,37 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           applyFactionData(factionId, data);
 
-          if (cachedPlayerId !== null && userIdHash !== null) {
+          if (userIdHash !== null) {
             twseClient.submit(factionId, {
-              player_id: cachedPlayerId,
               user_id_hash: userIdHash,
               torn_response: data,
             });
+          }
+        }
+      }
+
+      // Performs an initial TWSE Server GET then opens an SSE subscription per faction.
+      // Called fire-and-forget from initWarMonitoring; guards on `running` after each await.
+      async function _openTwseConnections(
+        factionIds: FactionId[],
+      ): Promise<void> {
+        const userIdHash = await getUserIdHash();
+        if (!running) return;
+
+        for (const factionId of factionIds) {
+          const data = await twseClient.fetchLatest(factionId);
+          if (!running) return;
+          if (data) applyFactionData(factionId, data);
+
+          if (userIdHash) {
+            const unsub = twseClient.subscribe(
+              factionId,
+              (sseData) => {
+                applyFactionData(factionId, sseData);
+              },
+              userIdHash,
+            );
+            sseUnsubscribers.push(unsub);
           }
         }
       }
@@ -1271,6 +1285,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             const ids = getFactionIds();
             ids.forEach(populateCachedStatus);
             updateStatuses();
+            // openTwseConnections(ids); // disabled: SSE response.response/responseText both undefined in Violentmonkey onprogress
           }
           if (foundWar && injectedToggle) {
             log.info(
@@ -1288,6 +1303,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           const ids = getFactionIds();
           ids.forEach(populateCachedStatus);
           updateStatuses();
+          // openTwseConnections(ids); // disabled: SSE response.response/responseText both undefined in Violentmonkey onprogress
 
           if (injectedToggle) {
             log.info(
@@ -1341,6 +1357,15 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
       }, WarMonitorFeature.intervals.watch);
 
+      // Poll TWSE Server every 1s to fill gaps when SSE is reconnecting
+      const twseInterval = setInterval(async () => {
+        if (!running || !foundWar) return;
+        for (const factionId of getFactionIds()) {
+          const data = await twseClient.fetchLatest(factionId);
+          if (data) applyFactionData(factionId, data);
+        }
+      }, 1_000);
+
       stopMonitor = () => {
         active = false;
         running = false;
@@ -1348,8 +1373,13 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         // 1. Clear intervals
         clearInterval(pollingInterval);
         clearInterval(watchInterval);
+        clearInterval(twseInterval);
 
-        // 2. Disconnect observers
+        // 2. Close SSE connections
+        for (const unsub of sseUnsubscribers) unsub();
+        sseUnsubscribers.length = 0;
+
+        // 3. Disconnect observers
         if (descriptionsObserver) {
           descriptionsObserver.disconnect();
         }

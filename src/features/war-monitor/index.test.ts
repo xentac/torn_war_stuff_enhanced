@@ -22,6 +22,10 @@ const localStorageMock = {
 };
 global.localStorage = localStorageMock as any;
 
+// GM_xmlhttpRequest is injected by the userscript manager at runtime.
+// Return a no-op handle so TWSE Server calls don't throw in the test environment.
+global.GM_xmlhttpRequest = vi.fn().mockReturnValue({ abort: vi.fn() }) as any;
+
 // 2. Setup robust, lightweight MockElement DOM polyfill
 class MockElement {
   public tagName: string;
