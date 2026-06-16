@@ -18,7 +18,12 @@ import {
   extract_destinations_from_description,
   shorten_destination,
 } from "@utils/travel";
-import type { FactionMemberStatus } from "@utils/types";
+import { twseClient } from "@utils/twse-server";
+import type {
+  FactionId,
+  FactionMemberStatus,
+  FactionResponse,
+} from "@utils/types";
 import "@ui/styles.css";
 import { type Feature, StartTime } from "../feature";
 
@@ -132,6 +137,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         WarMonitorFeature.intervals.minTimeBetweenRequests;
 
       const activeChains = new Map<string, ActiveChainState>();
+      const lastAppliedTimestamp = new Map<FactionId, number>();
+      let cachedPlayerId: number | null = null;
+      let cachedUserIdHashKey: string | null = null;
+      let cachedUserIdHash: string | null = null;
       let lastChainHtml = "";
       let isDragging = false;
       let _isSorting = false;
@@ -155,6 +164,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         factionCache.clearAll();
         activeChains.clear();
         unexpectedTransitions.clear();
+        lastAppliedTimestamp.clear();
         updateStatuses();
       };
       window.addEventListener("twse-clear-cache", onClearCache);
@@ -742,6 +752,72 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         return " LATE";
       }
 
+      // Returns the current user's player ID from the nav settings menu profile link.
+      function getPlayerIdFromDom(): number | null {
+        const link = document.querySelector<HTMLAnchorElement>(
+          'ul.settings-menu a[href*="profiles.php?XID="]',
+        );
+        if (!link) return null;
+        const match = link.href.match(/profiles\.php\?XID=(\d+)/);
+        return match ? parseInt(match[1], 10) : null;
+      }
+
+      // Returns SHA-256(apiKey) as a hex string, cached per key value.
+      async function getUserIdHash(): Promise<string | null> {
+        const key = twseconfig.apiKey;
+        if (!key) return null;
+        if (cachedUserIdHashKey === key) return cachedUserIdHash;
+        const encoded = new TextEncoder().encode(key);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+        const hash = Array.from(new Uint8Array(hashBuffer))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        cachedUserIdHashKey = key;
+        cachedUserIdHash = hash;
+        return hash;
+      }
+
+      // Applies a FactionResponse to memberStatus and activeChains.
+      // Skips data that is not newer than the last applied timestamp for this faction.
+      function applyFactionData(
+        factionId: FactionId,
+        data: FactionResponse,
+      ): void {
+        if (data.timestamp !== undefined) {
+          const last = lastAppliedTimestamp.get(factionId) ?? 0;
+          if (data.timestamp <= last) return;
+          lastAppliedTimestamp.set(factionId, data.timestamp);
+        }
+
+        if (data.members) {
+          const reqTime = Date.now();
+          const factionStatus: Record<string, FactionMemberStatus> = {};
+
+          for (const memberData of data.members) {
+            const id = String(memberData.id);
+            const status = memberData.status;
+            status.last_req_time = reqTime;
+
+            memberStatus.set(id, status);
+            factionStatus[id] = status;
+          }
+
+          factionCache.set(factionId, factionStatus);
+        }
+
+        if (data.chain) {
+          activeChains.set(factionId, {
+            current: data.chain.current,
+            max: data.chain.max,
+            timeout: data.chain.timeout,
+            modifier: data.chain.modifier,
+            apiReceivedAt: getCurrentTimeSec(),
+            cooldown: data.chain.cooldown || 0,
+            end: data.chain.end,
+          });
+        }
+      }
+
       // Primary update polling executor
       async function updateStatuses() {
         if (!running) return;
@@ -752,6 +828,9 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         const now = Date.now();
         if (now - lastRequestTime < minTimeBetweenRequestsMs) return;
         lastRequestTime = now;
+
+        if (cachedPlayerId === null) cachedPlayerId = getPlayerIdFromDom();
+        const userIdHash = await getUserIdHash();
 
         for (const factionId of factionIds) {
           log.debug(`Fetching API status update for faction: ${factionId}`);
@@ -769,31 +848,13 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             continue;
           }
 
-          if (data.members) {
-            const reqTime = Date.now();
-            const factionStatus: Record<string, FactionMemberStatus> = {};
+          applyFactionData(factionId, data);
 
-            for (const memberData of data.members) {
-              const id = String(memberData.id);
-              const status = memberData.status;
-              status.last_req_time = reqTime;
-
-              memberStatus.set(id, status);
-              factionStatus[id] = status;
-            }
-
-            factionCache.set(factionId, factionStatus);
-          }
-
-          if (data.chain) {
-            activeChains.set(factionId, {
-              current: data.chain.current,
-              max: data.chain.max,
-              timeout: data.chain.timeout,
-              modifier: data.chain.modifier,
-              apiReceivedAt: getCurrentTimeSec(),
-              cooldown: data.chain.cooldown || 0,
-              end: data.chain.end,
+          if (cachedPlayerId !== null && userIdHash !== null) {
+            twseClient.submit(factionId, {
+              player_id: cachedPlayerId,
+              user_id_hash: userIdHash,
+              torn_response: data,
             });
           }
         }
