@@ -1,5 +1,6 @@
 export type TimestampMs = number;
 export type TimestampSec = number;
+export type FactionId = string;
 
 export interface FactionMemberStatus {
   state:

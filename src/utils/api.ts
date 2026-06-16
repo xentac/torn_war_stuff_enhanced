@@ -1,6 +1,6 @@
 import { twseconfig } from "./config";
 import logger from "./logger";
-import type { FactionResponse } from "./types";
+import type { FactionId, FactionResponse } from "./types";
 
 const log = logger.child("api");
 
@@ -12,7 +12,7 @@ export class TornApiClient {
    * Requests 'members', 'chain', and 'timestamp' selections.
    */
   public async fetchFactionData(
-    factionId: string,
+    factionId: FactionId,
   ): Promise<FactionResponse | null> {
     const tornpdakey = "###PDA-APIKEY###";
     let key = twseconfig.apiKey;

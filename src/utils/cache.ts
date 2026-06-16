@@ -1,5 +1,5 @@
 import logger from "./logger";
-import type { FactionMemberStatus } from "./types";
+import type { FactionId, FactionMemberStatus } from "./types";
 
 const log = logger.child("cache");
 
@@ -10,7 +10,7 @@ export class FactionCache {
   /**
    * Retrieves the cached status for a faction.
    */
-  public get(factionId: string): Record<string, FactionMemberStatus> | null {
+  public get(factionId: FactionId): Record<string, FactionMemberStatus> | null {
     try {
       const key = `${this.prefix}${factionId}`;
       const cacheStr = localStorage.getItem(key);
@@ -42,7 +42,7 @@ export class FactionCache {
    * Caches the status for a faction.
    */
   public set(
-    factionId: string,
+    factionId: FactionId,
     status: Record<string, FactionMemberStatus>,
   ): void {
     try {
@@ -60,7 +60,7 @@ export class FactionCache {
   /**
    * Removes cached status for a faction.
    */
-  public remove(factionId: string): void {
+  public remove(factionId: FactionId): void {
     try {
       const key = `${this.prefix}${factionId}`;
       localStorage.removeItem(key);
