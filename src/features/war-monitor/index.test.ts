@@ -323,6 +323,8 @@ class MockElement {
 const documentListeners = new Map<string, Array<(e: any) => void>>();
 const documentMock = {
   body: new MockElement("body"),
+  hidden: false,
+  hasFocus: () => false,
   createElement(tag: string) {
     return new MockElement(tag);
   },
