@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta15
+// @version      2.0-beta16
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1045,8 +1045,19 @@ reset() {
       }
     }
     onKeyInput(e2) {
-      this.draftApiKey = e2.target.value.trim();
+      this.draftApiKey = e2.target.value;
       this.showSavedMessage = false;
+    }
+    onKeyChange(e2) {
+      const val = e2.target.value.trim();
+      this.draftApiKey = val;
+      this.dispatchEvent(
+        new CustomEvent("twse-save-key", {
+          detail: { apiKey: val },
+          bubbles: true,
+          composed: true
+        })
+      );
     }
     onWarSortingChange(e2) {
       this.draftWarSorting = e2.target.checked;
@@ -1083,6 +1094,7 @@ reset() {
               maxlength="16"
               .value=${this.draftApiKey}
               @input=${this.onKeyInput}
+              @change=${this.onKeyChange}
             />
             <div class="twse-api-explanation">
               <strong>Info:</strong> Provide a valid 16-character public API key to pull faction war information and real-time member statuses.
@@ -1228,6 +1240,12 @@ reset() {
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
         panel.debugLogs = twseconfig.debug_logs;
         log$4.info("Settings reset to defaults");
+        window.dispatchEvent(new CustomEvent("twse-config-updated"));
+      });
+      panel.addEventListener("twse-save-key", (e2) => {
+        const detail = e2.detail;
+        twseconfig.apiKey = detail.apiKey;
+        log$4.info("API key saved");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
       panel.addEventListener("twse-clear-cache", () => {
@@ -1496,6 +1514,9 @@ clearAll() {
     async run() {
       let active = false;
       let stopMonitor = null;
+      const isVisible = () => {
+        return !document.hidden && !document.hasFocus();
+      };
       const startMonitor = async () => {
         if (active) return;
         active = true;
@@ -1513,7 +1534,7 @@ clearAll() {
         syncBodyClasses();
         let running = true;
         let foundWar = false;
-        let pageVisible = !document.hidden;
+        let pageVisible = isVisible();
         let everSorted = false;
         let ffscouterSortingDeferred = false;
         const memberStatus = new Map();
@@ -1689,7 +1710,7 @@ clearAll() {
           });
         }
         const onVisibilityChange = () => {
-          pageVisible = !document.hidden;
+          pageVisible = isVisible();
         };
         document.addEventListener("visibilitychange", onVisibilityChange);
         async function copyToClipboard(text) {
@@ -1745,7 +1766,8 @@ clearAll() {
           copyBtn.addEventListener("click", async (e2) => {
             e2.preventDefault();
             e2.stopPropagation();
-            const name = atag.textContent?.trim() || "";
+            const ariaMatch = atag.getAttribute("aria-label")?.match(/^View profile of (.+)$/);
+            const name = ariaMatch ? ariaMatch[1].trim() : atag.textContent?.trim() || "";
             const copyText = `${name} [${id}]`;
             const success = await copyToClipboard(copyText);
             if (success) {
@@ -2411,6 +2433,7 @@ clearAll() {
           }
         }, WarMonitorFeature.intervals.poll);
         const watchInterval = setInterval(() => {
+          pageVisible = isVisible();
           if (foundWar && running && pageVisible) {
             watch();
           }
