@@ -585,6 +585,81 @@ describe("WarMonitorFeature Sorting Config", () => {
     }
   });
 
+  it("should copy only name and ID, excluding FF Scouter's injected estimate value", async () => {
+    // 1. Setup mock faction war DOM layout
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+
+    const li = new MockElement("li");
+    li.className = "enemy";
+
+    const memberCol = new MockElement("div");
+    memberCol.className = "member";
+
+    // FF Scouter nests the estimate bubble *inside* the profile anchor here,
+    // alongside the visible name span. Torn still sets aria-label cleanly.
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/profiles.php?XID=347472");
+    atag.setAttribute("aria-label", "View profile of Asprin50");
+    const honorTextWrap = new MockElement("div");
+    honorTextWrap.className = "honor-text-wrap honorContainer ffsv3-gauge";
+    const honorName = new MockElement("span");
+    honorName.className = "honor-text";
+    honorName.textContent = "Asprin50";
+    const estimateBubble = new MockElement("div");
+    estimateBubble.className = "ffsv3-bubble";
+    estimateBubble.textContent = "13.68";
+    honorTextWrap.appendChild(honorName);
+    honorTextWrap.appendChild(estimateBubble);
+    atag.appendChild(honorTextWrap);
+    // textContent of the whole anchor now includes the estimate, mirroring
+    // the real FF Scouter DOM: "Asprin5013.68"
+
+    const statusDiv = new MockElement("div");
+    statusDiv.className = "status ok";
+
+    memberCol.appendChild(atag);
+    li.appendChild(memberCol);
+    li.appendChild(statusDiv);
+    ul.appendChild(li);
+    descriptions.appendChild(ul);
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    // 2. Set up navigator.clipboard mock
+    const clipboardWriteMock = vi.fn().mockResolvedValue(undefined);
+    if (!global.navigator) {
+      global.navigator = {} as any;
+    }
+    Object.defineProperty(global.navigator, "clipboard", {
+      value: {
+        writeText: clipboardWriteMock,
+      },
+      writable: true,
+      configurable: true,
+    });
+    (global.window as any).flutter_inappwebview = undefined;
+
+    // 3. Run feature
+    WarMonitorFeature.run();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const copyBtn = memberCol.querySelector(".twse-copy-btn");
+    expect(copyBtn).not.toBeNull();
+
+    if (copyBtn) {
+      await copyBtn.dispatchEvent(new Event("click"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(clipboardWriteMock).toHaveBeenCalledWith("Asprin50 [347472]");
+    }
+  });
+
   it("should create floating bubble and update chain status when active chains are fetched", async () => {
     const { tornApi } = await import("@utils/api");
     const { twseconfig } = await import("@utils/config");

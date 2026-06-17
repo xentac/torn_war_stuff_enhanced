@@ -435,7 +435,15 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           e.preventDefault();
           e.stopPropagation();
 
-          const name = atag.textContent?.trim() || "";
+          // Torn always sets this aria-label on the profile link; prefer it over
+          // textContent since third-party scripts (e.g. FF Scouter) can inject
+          // extra text (estimate values) inside the anchor's descendants.
+          const ariaMatch = atag
+            .getAttribute("aria-label")
+            ?.match(/^View profile of (.+)$/);
+          const name = ariaMatch
+            ? ariaMatch[1].trim()
+            : atag.textContent?.trim() || "";
           const copyText = `${name} [${id}]`;
 
           const success = await copyToClipboard(copyText);
