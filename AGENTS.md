@@ -6,7 +6,6 @@
 - **Explicit Plan Approval:** Never proceed with an implementation plan until the user explicitly says "yes, proceed with the plan".
 - **Never execute the next phase without explicit approval:** When I am reviewing a plan or implementation, address my feedback exactly and nothing more. Don't move on to the next phase of implementation without explicit, unambiguous approval.
 - **No lint/analysis warnings/errors:** Verify that `bun run lint` completes with no errors/warnings. EXCEPTION: `src/ffscouter.js` is the old version of the script that can have errors, eventually this file will be fully fixed or deleted.
-- **Run tests:** Make sure that all changes have working tests as well. Don't delete tests unless the code under test has also been removed. Run tests by executing `bun run test --run`. DO NOT RUN `npx vitest`.
 - **No pager for git:** All git commands should be run with `--no-pager`.
 - \*Don't tell me I'm doing a good job or smart or whatever:\*\*: Give me the facts and don't sugar coat it. We are engineers talking about technical tradeoffs. I don't need to be told how observant or smart I am. We just need to address the issues.
 
@@ -23,3 +22,8 @@ Default label vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-h
 ### Domain docs
 
 Single-context layout — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+# Gotchas
+
+- Tests are only run using vitest with the command `bun run test --run`. You can add any arguments you want to that command and they will be passed to vitest directly. DO NOT RUN `npx vitest` or `bun test` or `bun x vitest`.
+- JJ is the version control system of choice. Only fallback to git if the copy of this repo is not configured for jj.
