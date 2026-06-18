@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta16
+// @version      2.0-beta17
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1263,7 +1263,7 @@ reset() {
   const log$3 = logger.child("api");
   class TornApiClient {
     constructor() {
-      this.baseUrl = "https://api.torn.com/faction/";
+      this.baseUrl = "https://api.torn.com/v2/faction";
     }
 async fetchFactionData(factionId) {
       const tornpdakey = "###PDA-APIKEY###";
@@ -1275,19 +1275,21 @@ async fetchFactionData(factionId) {
         log$3.warn("Torn API key is invalid or not set. Skipping API request.");
         return null;
       }
-      const url = `${this.baseUrl}${factionId}?selections=basic,chain&key=${key}&comment=TornWarStuffEnhanced`;
+      const url = `${this.baseUrl}?id=${factionId}&selections=members,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced`;
       try {
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`HTTP Error status: ${response.status}`);
+          try {
+            const errData = await response.json();
+            log$3.error(
+              `Torn API returned error code ${errData.code}: ${errData.error}`
+            );
+            return { error: errData };
+          } catch {
+            throw new Error(`HTTP Error status: ${response.status}`);
+          }
         }
         const data = await response.json();
-        if (data.error) {
-          log$3.error(
-            `Torn API returned error code ${data.error.code}: ${data.error.error}`
-          );
-          return data;
-        }
         return data;
       } catch (e2) {
         log$3.error(
@@ -2035,23 +2037,24 @@ clearAll() {
               }
               continue;
             }
-            if (!data.members) continue;
-            const reqTime = Date.now();
-            const factionStatus = {};
-            for (const [id, memberData] of Object.entries(data.members)) {
-              const status = memberData.status;
-              status.last_req_time = reqTime;
-              memberStatus.set(id, status);
-              factionStatus[id] = status;
+            if (data.members) {
+              const reqTime = Date.now();
+              const factionStatus = {};
+              for (const memberData of data.members) {
+                const id = String(memberData.id);
+                const status = memberData.status;
+                status.last_req_time = reqTime;
+                memberStatus.set(id, status);
+                factionStatus[id] = status;
+              }
+              factionCache.set(factionId, factionStatus);
             }
-            factionCache.set(factionId, factionStatus);
             if (data.chain) {
               activeChains.set(factionId, {
                 current: data.chain.current,
                 max: data.chain.max,
                 timeout: data.chain.timeout,
                 modifier: data.chain.modifier,
-                tag: data.tag || "",
                 apiReceivedAt: getCurrentTimeSec(),
                 cooldown: data.chain.cooldown || 0,
                 end: data.chain.end
@@ -2073,7 +2076,7 @@ clearAll() {
               queueAttrWrite(statusDiv, "data-twse-overridden", "false");
               return;
             }
-            if (queueAttrWrite(li, "data-until", String(status.until))) {
+            if (queueAttrWrite(li, "data-until", String(status.until ?? 0))) {
               dirtySort = true;
             }
             if (queueAttrWrite(li, "data-player_id", String(id))) {
@@ -2153,7 +2156,7 @@ clearAll() {
               case "Hospital":
               case "Jail": {
                 const now = getCurrentTimeSec();
-                const timeRemaining = Math.round(status.until - now);
+                const timeRemaining = Math.round((status.until ?? 0) - now);
                 const hasHospitalClass = statusDiv.classList.contains("hospital") || statusDiv.classList.contains("jail");
                 if (!hasHospitalClass) {
                   if (timeRemaining >= 0) {
@@ -2165,7 +2168,11 @@ clearAll() {
                     }
                   } else {
                     unexpectedTransitions.delete(id);
-                    if (queueAttrWrite(li, "data-okay-since", `${status.until}000`)) {
+                    if (queueAttrWrite(
+                      li,
+                      "data-okay-since",
+                      String((status.until ?? 0) * 1e3)
+                    )) {
                       dirtySort = true;
                     }
                     if (queueAttrWrite(li, "data-sortA", "1")) {
@@ -2290,27 +2297,27 @@ clearAll() {
             let timerClass = "okay";
             let countClass = "";
             if (chain.cooldown > 0) {
-              const elapsed = now - chain.apiReceivedAt;
-              const remainingCooldown = Math.max(0, chain.cooldown - elapsed);
+              const remainingCooldown = Math.max(0, chain.cooldown - now);
               formattedTime = formatChainCooldown(remainingCooldown);
               timerClass = "cooldown";
               countClass = "cooldown";
-            } else if (chain.timeout === 0) {
+            } else if (chain.current === 0 || !chain.end || chain.end === 0) {
               formattedTime = "-:--";
               timerClass = "okay";
             } else {
-              const elapsed = now - chain.apiReceivedAt;
-              const remaining = chain.end && chain.end > 0 ? chain.end - now : chain.timeout - elapsed;
-              formattedTime = formatChainTimeout(remaining);
+              const remaining = chain.end - now;
               if (remaining < 0) {
+                formattedTime = formatChainTimeout(remaining);
                 timerClass = "negative";
               } else if (remaining < 60) {
+                formattedTime = formatChainTimeout(remaining);
                 timerClass = "urgent";
+              } else {
+                formattedTime = formatChainTimeout(remaining);
               }
             }
             html += `
             <div class="twse-chain-row">
-              <span class="twse-chain-tag">[${chain.tag || "Faction"}]</span>
               <div class="twse-chain-stats">
                 <span class="twse-chain-count ${countClass}">${chain.current}/${chain.max}</span>
                 <span class="twse-chain-mult">${chain.modifier.toFixed(2)}x</span>
