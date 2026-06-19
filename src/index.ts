@@ -4,7 +4,19 @@ import logger from "./utils/logger";
 
 const log = logger.child("boot");
 
+// A `window` flag is not reliable here: userscript managers can inject into a
+// different realm/global than the page's own `window`, so two injections of this
+// script may not see the same `window`. `document.documentElement` is the one thing
+// every injection into the same actual page genuinely shares.
+const INJECTION_KEY = "data-twse-injected";
+
 async function boot() {
+  if (document.documentElement.hasAttribute(INJECTION_KEY)) {
+    log.info("Script already injected, skipping boot.");
+    return;
+  }
+  document.documentElement.setAttribute(INJECTION_KEY, "true");
+
   log.info("Initializing Torn War Stuff Enhanced...");
 
   for (const feature of Features) {
