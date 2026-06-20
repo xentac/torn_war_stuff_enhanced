@@ -93,7 +93,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
     let stopMonitor: (() => void) | null = null;
 
     const isVisible = () => {
-      return !document.hidden && document.hasFocus();
+      return !document.hidden;
     };
 
     const startMonitor = async () => {
