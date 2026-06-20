@@ -138,7 +138,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       const activeChains = new Map<string, ActiveChainState>();
       const lastAppliedTimestamp = new Map<FactionId, number>();
-      const sseUnsubscribers: (() => void)[] = [];
       let cachedUserIdHashKey: string | null = null;
       let cachedUserIdHash: string | null = null;
       let lastChainHtml = "";
@@ -848,32 +847,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
       }
 
-      // Performs an initial TWSE Server GET then opens an SSE subscription per faction.
-      // Called fire-and-forget from initWarMonitoring; guards on `running` after each await.
-      async function _openTwseConnections(
-        factionIds: FactionId[],
-      ): Promise<void> {
-        const userIdHash = await getUserIdHash();
-        if (!running) return;
-
-        for (const factionId of factionIds) {
-          const data = await twseClient.fetchLatest(factionId);
-          if (!running) return;
-          if (data) applyFactionData(factionId, data);
-
-          if (userIdHash) {
-            const unsub = twseClient.subscribe(
-              factionId,
-              (sseData) => {
-                applyFactionData(factionId, sseData);
-              },
-              userIdHash,
-            );
-            sseUnsubscribers.push(unsub);
-          }
-        }
-      }
-
       // Periodic UI updates (attributes & layout settings)
       function watch() {
         deferredWrites.length = 0;
@@ -1285,7 +1258,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             const ids = getFactionIds();
             ids.forEach(populateCachedStatus);
             updateStatuses();
-            // openTwseConnections(ids); // disabled: SSE response.response/responseText both undefined in Violentmonkey onprogress
           }
           if (foundWar && injectedToggle) {
             log.info(
@@ -1303,7 +1275,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           const ids = getFactionIds();
           ids.forEach(populateCachedStatus);
           updateStatuses();
-          // openTwseConnections(ids); // disabled: SSE response.response/responseText both undefined in Violentmonkey onprogress
 
           if (injectedToggle) {
             log.info(
@@ -1357,7 +1328,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
       }, WarMonitorFeature.intervals.watch);
 
-      // Poll TWSE Server every 1s to fill gaps when SSE is reconnecting
+      // Poll TWSE Server every 1s for fresher data contributed by other script users
       const twseInterval = setInterval(async () => {
         if (!running || !foundWar) return;
         for (const factionId of getFactionIds()) {
@@ -1375,11 +1346,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         clearInterval(watchInterval);
         clearInterval(twseInterval);
 
-        // 2. Close SSE connections
-        for (const unsub of sseUnsubscribers) unsub();
-        sseUnsubscribers.length = 0;
-
-        // 3. Disconnect observers
+        // 2. Disconnect observers
         if (descriptionsObserver) {
           descriptionsObserver.disconnect();
         }

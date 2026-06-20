@@ -21,13 +21,6 @@ interface GmDetails {
   data?: string;
   onload?: (r: { status: number; responseText: string }) => void;
   onerror?: (e?: unknown) => void;
-  onprogress?: (r: { responseText?: string; response?: string }) => void;
-  onabort?: () => void;
-}
-
-// Formats a FactionResponse as a single SSE event string
-function sseEvent(data: FactionResponse): string {
-  return `data: ${JSON.stringify(data)}\n\n`;
 }
 
 describe("TwseServerClient", () => {
@@ -43,11 +36,11 @@ describe("TwseServerClient", () => {
     client = new TwseServerClient();
     gmRequests = [];
 
-    // Default: auto-resolve GET /faction/:id requests; leave subscribe/POST open.
+    // Default: auto-resolve GET requests; leave POST open.
     gmMock = vi.fn((details: GmDetails) => {
       const abort = vi.fn();
       gmRequests.push({ details, abort });
-      if (details.method === "GET" && !details.url.includes("/subscribe")) {
+      if (details.method === "GET") {
         details.onload?.({
           status: 200,
           responseText: JSON.stringify(mockFactionResponse),
@@ -114,121 +107,6 @@ describe("TwseServerClient", () => {
       await client.fetchLatest("123");
       await client.fetchLatest("456"); // different faction, not rate-limited
       expect(gmMock).toHaveBeenCalledTimes(2);
-    });
-
-    it("returns null immediately when an SSE connection is active", async () => {
-      client.subscribe("123", () => {}, "hash");
-      expect(await client.fetchLatest("123")).toBeNull();
-      expect(gmMock).toHaveBeenCalledTimes(1); // only the subscribe call
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("subscribe", () => {
-    it("opens a GM request to the correct URL including tab_id", () => {
-      client.subscribe("123", () => {}, "abc123");
-      expect(gmRequests).toHaveLength(1);
-      expect(gmRequests[0].details.url).toBe(
-        `${TWSE_SERVER_BASE_URL}/faction/123/subscribe?user_id_hash=abc123&tab_id=${client.tabId}`,
-      );
-    });
-
-    it("calls onData with parsed FactionResponse on SSE message", () => {
-      const onData = vi.fn();
-      client.subscribe("123", onData, "hash");
-      gmRequests[0].details.onprogress?.({
-        responseText: sseEvent(mockFactionResponse),
-      });
-      expect(onData).toHaveBeenCalledWith(mockFactionResponse);
-    });
-
-    it("blocks fetchLatest while the SSE connection is active", async () => {
-      client.subscribe("123", () => {}, "hash");
-      expect(await client.fetchLatest("123")).toBeNull();
-    });
-
-    it("unblocks fetchLatest after unsubscribe", async () => {
-      const unsubscribe = client.subscribe("123", () => {}, "hash");
-      expect(await client.fetchLatest("123")).toBeNull();
-
-      unsubscribe();
-      expect(await client.fetchLatest("123")).toEqual(mockFactionResponse);
-    });
-
-    it("aborts the GM request on unsubscribe", () => {
-      const unsubscribe = client.subscribe("123", () => {}, "hash");
-      unsubscribe();
-      expect(gmRequests[0].abort).toHaveBeenCalled();
-    });
-
-    it("reconnects with exponential backoff on error", () => {
-      client.subscribe("123", () => {}, "hash");
-
-      // First error → retry after 1s, then bump delay to 2s
-      gmRequests[0].details.onerror?.();
-      expect(gmRequests).toHaveLength(1);
-
-      vi.advanceTimersByTime(1_000);
-      expect(gmRequests).toHaveLength(2);
-
-      // Second error → retry after 2s
-      gmRequests[1].details.onerror?.();
-      vi.advanceTimersByTime(1_000);
-      expect(gmRequests).toHaveLength(2); // not yet
-
-      vi.advanceTimersByTime(1_000);
-      expect(gmRequests).toHaveLength(3);
-    });
-
-    it("does not reconnect after unsubscribe", () => {
-      const unsubscribe = client.subscribe("123", () => {}, "hash");
-      unsubscribe();
-      gmRequests[0].details.onerror?.();
-
-      vi.advanceTimersByTime(5_000);
-      expect(gmRequests).toHaveLength(1);
-    });
-
-    it("resets retry delay to 1s after a successful message", () => {
-      client.subscribe("123", () => {}, "hash");
-
-      // First error bumps delay from 1s → 2s
-      gmRequests[0].details.onerror?.();
-      vi.advanceTimersByTime(1_000); // reconnects at 1s → request[1]
-
-      // Successful message resets delay back to 1s
-      gmRequests[1].details.onprogress?.({
-        responseText: sseEvent(mockFactionResponse),
-      });
-
-      // Next error should retry at 1s, not 2s
-      gmRequests[1].details.onerror?.();
-      vi.advanceTimersByTime(1_000);
-      expect(gmRequests).toHaveLength(3);
-    });
-
-    it("unblocks fetchLatest while reconnecting between retries", async () => {
-      client.subscribe("123", () => {}, "hash");
-      gmRequests[0].details.onerror?.(); // SSE dropped, reconnect pending
-
-      // Before reconnect fires, fetchLatest should work
-      expect(await client.fetchLatest("123")).toEqual(mockFactionResponse);
-    });
-
-    it("handles partial SSE events split across multiple onprogress calls", () => {
-      const onData = vi.fn();
-      client.subscribe("123", onData, "hash");
-
-      const full = sseEvent(mockFactionResponse);
-      const half = Math.floor(full.length / 2);
-
-      // First chunk: partial event — should not fire onData yet
-      gmRequests[0].details.onprogress?.({ responseText: full.slice(0, half) });
-      expect(onData).not.toHaveBeenCalled();
-
-      // Second chunk: completes the event — should fire onData
-      gmRequests[0].details.onprogress?.({ responseText: full });
-      expect(onData).toHaveBeenCalledWith(mockFactionResponse);
     });
   });
 

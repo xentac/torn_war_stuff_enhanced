@@ -43,8 +43,5 @@ _Avoid_: Hospital highlight, green highlight
 **TWSE Server** (full name: Torn War Stuff Enhanced Server): An external service that aggregates raw Torn API v2 responses contributed by all script users. Any user can query it for a fresher snapshot than their own poll interval would provide — because another user may have called the Torn API more recently. Write path: fire-and-forget POST after each Torn API poll. Read path: supplements the Torn API — delivers other users' updates in the gaps between the client's own 10-second Torn API polls. The Torn API poll is always unconditional; the TWSE Server is not a replacement for it.
 _Avoid_: Collection service, community cache, cache service, API proxy
 
-**TWSE Server subscription**: A persistent SSE connection to the TWSE Server (`GET /faction/{faction_id}/subscribe?user_id_hash={hash}`) that pushes a `FactionResponse` event whenever a new valid submission arrives for that faction. Opened per faction when the war monitor starts, closed when it stops. When an SSE connection is active, TWSE Server GET polling is unnecessary. The `user_id_hash` query parameter prevents the server from echoing the current user's own submissions back.
-_Avoid_: Websocket, live poll, push channel
-
 **Server timestamp**: The `timestamp` field returned by the Torn API v2 `timestamp` selection — a Unix timestamp (seconds) representing when the Torn server generated the response snapshot. The authoritative freshness signal in the community cache: when multiple users have contributed responses, the one with the highest server timestamp is the most recent, regardless of which user contributed it or when.
 _Avoid_: API timestamp, request timestamp, response time, client timestamp
