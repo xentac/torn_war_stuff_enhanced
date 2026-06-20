@@ -1328,14 +1328,27 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
       }, WarMonitorFeature.intervals.watch);
 
-      // Poll TWSE Server every 1s for fresher data contributed by other script users
-      const twseInterval = setInterval(async () => {
-        if (!running || !foundWar) return;
-        for (const factionId of getFactionIds()) {
-          const data = await twseClient.fetchLatest(factionId);
-          if (data) applyFactionData(factionId, data);
+      let cacheTimer: NodeJS.Timeout | null = null;
+
+      // Poll TWSE Server 1 sec after each poll for fresher data contributed by other script users
+      const queryCache = async () => {
+        if (cacheTimer) {
+          clearTimeout(cacheTimer);
         }
-      }, 1_000);
+        cacheTimer = null;
+        try {
+          if (!running || !foundWar) return;
+          for (const factionId of getFactionIds()) {
+            const data = await twseClient.fetchLatest(factionId);
+            if (data) applyFactionData(factionId, data);
+          }
+        } finally {
+          if (!cacheTimer) {
+            cacheTimer = setTimeout(queryCache, 1_000);
+          }
+        }
+      };
+      queryCache();
 
       stopMonitor = () => {
         active = false;
@@ -1344,7 +1357,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         // 1. Clear intervals
         clearInterval(pollingInterval);
         clearInterval(watchInterval);
-        clearInterval(twseInterval);
+        if (cacheTimer) {
+          clearTimeout(cacheTimer);
+          cacheTimer = null;
+        }
 
         // 2. Disconnect observers
         if (descriptionsObserver) {
