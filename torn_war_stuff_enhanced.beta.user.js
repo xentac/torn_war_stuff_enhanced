@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta18
+// @version      2.0-beta19
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1522,7 +1522,7 @@ async fetchLatest(factionId) {
             }
           },
           onerror: (e2) => {
-            log$2.error(`Failed to fetch latest data for faction ${factionId}:`, e2);
+            log$2.debug(`Failed to fetch latest data for faction ${factionId}:`, e2);
             resolve(null);
           }
         });
