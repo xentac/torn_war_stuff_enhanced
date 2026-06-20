@@ -53,7 +53,7 @@ export class TwseServerClient {
           }
         },
         onerror: (e) => {
-          log.error(`Failed to fetch latest data for faction ${factionId}:`, e);
+          log.debug(`Failed to fetch latest data for faction ${factionId}:`, e);
           resolve(null);
         },
       });
