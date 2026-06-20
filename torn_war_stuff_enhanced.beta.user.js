@@ -1,14 +1,16 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta17
+// @version      2.0-beta18
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
 // @match        https://www.torn.com/factions.php*
 // @connect      api.torn.com
+// @connect      twse.dev
 // @grant        GM_addStyle
 // @grant        GM_registerMenuCommand
+// @grant        GM_xmlhttpRequest
 // @run-at       document-end
 // ==/UserScript==
 
@@ -154,7 +156,7 @@ formatArgs(args) {
     "TWSE",
     1
 );
-  const log$7 = logger.child("storage");
+  const log$8 = logger.child("storage");
   class Storage {
 constructor(prefix) {
       this.prefix = prefix;
@@ -167,7 +169,7 @@ set(key, value, expireConfig) {
         };
         localStorage.setItem(this.prefix + key, JSON.stringify(item));
       } catch (error) {
-        log$7.error(`Error storing item '${key}':`, error);
+        log$8.error(`Error storing item '${key}':`, error);
       }
     }
 get(key) {
@@ -183,18 +185,18 @@ get(key) {
           item = null;
         }
         if (!item) {
-          log$7.warn(`Key '${key}' has invalid JSON in it.`);
+          log$8.warn(`Key '${key}' has invalid JSON in it.`);
           this.remove(key);
           return null;
         }
         if (item.expiration && Date.now() > item.expiration) {
           this.remove(key);
-          log$7.debug(`Key '${key}' has expired.`);
+          log$8.debug(`Key '${key}' has expired.`);
           return null;
         }
         return item.value;
       } catch (error) {
-        log$7.error(`Error retrieving item '${key}':`, error);
+        log$8.error(`Error retrieving item '${key}':`, error);
         return null;
       }
     }
@@ -202,7 +204,7 @@ remove(key) {
       try {
         localStorage.removeItem(this.prefix + key);
       } catch (error) {
-        log$7.error(`Error removing item '${key}':`, error);
+        log$8.error(`Error removing item '${key}':`, error);
       }
     }
 has(key) {
@@ -214,7 +216,7 @@ clearAll() {
           localStorage.removeItem(key);
         });
       } catch (error) {
-        log$7.error("Error clearing storage:", error);
+        log$8.error("Error clearing storage:", error);
       }
     }
   }
@@ -324,7 +326,7 @@ reset() {
     StartTime2[StartTime2["DocumentEnd"] = 2] = "DocumentEnd";
     return StartTime2;
   })(StartTime || {});
-  const log$6 = logger.child("feature:key-manager");
+  const log$7 = logger.child("feature:key-manager");
   const KeyManagerFeature = {
     name: "Key Manager",
     description: "Allows the user to register their Torn API key via a Tampermonkey menu command",
@@ -341,16 +343,16 @@ reset() {
             const trimmedKey = key.trim();
             if (trimmedKey.length === 16 || trimmedKey === "") {
               twseconfig.apiKey = trimmedKey;
-              log$6.info("Successfully updated API Key registration");
+              log$7.info("Successfully updated API Key registration");
               alert("Torn API key registered successfully!");
             } else {
               alert("Invalid key! A Torn API key must be exactly 16 characters.");
             }
           }
         });
-        log$6.debug("Tampermonkey menu command 'Register Key' initialized");
+        log$7.debug("Tampermonkey menu command 'Register Key' initialized");
       } else {
-        log$6.warn("GM_registerMenuCommand is not available in this context.");
+        log$7.warn("GM_registerMenuCommand is not available in this context.");
       }
     }
   };
@@ -358,7 +360,7 @@ reset() {
     __proto__: null,
     default: KeyManagerFeature
   }, Symbol.toStringTag, { value: "Module" }));
-  const log$5 = logger.child("dom");
+  const log$6 = logger.child("dom");
   function waitForElement(selector, timeoutMs = 15e3) {
     return new Promise((resolve) => {
       const existing = document.querySelector(selector);
@@ -379,7 +381,7 @@ reset() {
       if (timeoutMs > 0) {
         setTimeout(() => {
           observer.disconnect();
-          log$5.debug(`Timeout waiting for element selector: '${selector}'`);
+          log$6.debug(`Timeout waiting for element selector: '${selector}'`);
           resolve(null);
         }, timeoutMs);
       }
@@ -1202,7 +1204,7 @@ reset() {
   TWSESettingsPanel = __decorateClass([
     t("twse-settings-panel")
   ], TWSESettingsPanel);
-  const log$4 = logger.child("feature:settings");
+  const log$5 = logger.child("feature:settings");
   const SettingsFeature = {
     name: "Settings",
     description: "Renders and handles the settings panel at the bottom of the faction page",
@@ -1213,7 +1215,7 @@ reset() {
     async run() {
       const factionsContainer = await waitForElement("#factions");
       if (!factionsContainer) {
-        log$4.warn("Failed to find #factions element to append settings panel");
+        log$5.warn("Failed to find #factions element to append settings panel");
         return;
       }
       const panel = document.createElement("twse-settings-panel");
@@ -1229,7 +1231,7 @@ reset() {
         twseconfig.bubble_enabled = detail.bubbleEnabled;
         twseconfig.copy_button_enabled = detail.copyButtonEnabled;
         twseconfig.debug_logs = detail.debugLogs;
-        log$4.info("Settings saved successfully");
+        log$5.info("Settings saved successfully");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
       panel.addEventListener("twse-reset", () => {
@@ -1239,28 +1241,28 @@ reset() {
         panel.bubbleEnabled = twseconfig.bubble_enabled;
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
         panel.debugLogs = twseconfig.debug_logs;
-        log$4.info("Settings reset to defaults");
+        log$5.info("Settings reset to defaults");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
       panel.addEventListener("twse-save-key", (e2) => {
         const detail = e2.detail;
         twseconfig.apiKey = detail.apiKey;
-        log$4.info("API key saved");
+        log$5.info("API key saved");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
       panel.addEventListener("twse-clear-cache", () => {
-        log$4.info("Settings cleared caching successfully");
+        log$5.info("Settings cleared caching successfully");
         window.dispatchEvent(new CustomEvent("twse-clear-cache"));
       });
       factionsContainer.appendChild(panel);
-      log$4.debug("Settings panel successfully appended to #factions container");
+      log$5.debug("Settings panel successfully appended to #factions container");
     }
   };
   const __vite_glob_0_1 = Object.freeze( Object.defineProperty({
     __proto__: null,
     default: SettingsFeature
   }, Symbol.toStringTag, { value: "Module" }));
-  const log$3 = logger.child("api");
+  const log$4 = logger.child("api");
   class TornApiClient {
     constructor() {
       this.baseUrl = "https://api.torn.com/v2/faction";
@@ -1272,7 +1274,7 @@ async fetchFactionData(factionId) {
         key = tornpdakey;
       }
       if (!key || key.length !== 16) {
-        log$3.warn("Torn API key is invalid or not set. Skipping API request.");
+        log$4.warn("Torn API key is invalid or not set. Skipping API request.");
         return null;
       }
       const url = `${this.baseUrl}?id=${factionId}&selections=members,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced`;
@@ -1281,7 +1283,7 @@ async fetchFactionData(factionId) {
         if (!response.ok) {
           try {
             const errData = await response.json();
-            log$3.error(
+            log$4.error(
               `Torn API returned error code ${errData.code}: ${errData.error}`
             );
             return { error: errData };
@@ -1292,7 +1294,7 @@ async fetchFactionData(factionId) {
         const data = await response.json();
         return data;
       } catch (e2) {
-        log$3.error(
+        log$4.error(
           `Network or parse error fetching faction ${factionId} data:`,
           e2
         );
@@ -1309,7 +1311,7 @@ isRateLimitError(errorCode) {
     }
   }
   const tornApi = new TornApiClient();
-  const log$2 = logger.child("cache");
+  const log$3 = logger.child("cache");
   class FactionCache {
     constructor() {
       this.prefix = "xentac-torn_war_stuff_enhanced-status-";
@@ -1335,7 +1337,7 @@ get(factionId) {
         }
         return parsed.status;
       } catch (e2) {
-        log$2.error(`Error reading cached status for faction ${factionId}:`, e2);
+        log$3.error(`Error reading cached status for faction ${factionId}:`, e2);
         this.remove(factionId);
         return null;
       }
@@ -1349,7 +1351,7 @@ set(factionId, status) {
         };
         localStorage.setItem(key, JSON.stringify(cacheItem));
       } catch (e2) {
-        log$2.error(`Error caching status for faction ${factionId}:`, e2);
+        log$3.error(`Error caching status for faction ${factionId}:`, e2);
       }
     }
 remove(factionId) {
@@ -1357,7 +1359,7 @@ remove(factionId) {
         const key = `${this.prefix}${factionId}`;
         localStorage.removeItem(key);
       } catch (e2) {
-        log$2.error(`Error removing cached status for faction ${factionId}:`, e2);
+        log$3.error(`Error removing cached status for faction ${factionId}:`, e2);
       }
     }
 cleanExpired() {
@@ -1387,10 +1389,10 @@ cleanExpired() {
           }
         }
         if (cleanedCount > 0) {
-          log$2.info(`Cleaned ${cleanedCount} expired cached statuses`);
+          log$3.info(`Cleaned ${cleanedCount} expired cached statuses`);
         }
       } catch (e2) {
-        log$2.error("Error sweeping expired cached statuses:", e2);
+        log$3.error("Error sweeping expired cached statuses:", e2);
       }
     }
 clearAll() {
@@ -1405,9 +1407,9 @@ clearAll() {
         keysToRemove.forEach((key) => {
           localStorage.removeItem(key);
         });
-        log$2.info(`Cleared all cached faction statuses`);
+        log$3.info(`Cleared all cached faction statuses`);
       } catch (e2) {
-        log$2.error("Error clearing cached statuses:", e2);
+        log$3.error("Error clearing cached statuses:", e2);
       }
     }
   }
@@ -1484,6 +1486,128 @@ clearAll() {
       to: shorten_destination(match[2])
     };
   }
+  const log$2 = logger.child("twse-server");
+  const TWSE_SERVER_BASE_URL = "https://twse.dev";
+  const MIN_FETCH_INTERVAL_MS = 1e3;
+  class TwseServerClient {
+    constructor() {
+      this.tabId = crypto.randomUUID();
+      this.lastFetchTime = new Map();
+      this.activeSseConnections = new Set();
+    }
+async fetchLatest(factionId) {
+      if (this.activeSseConnections.has(factionId)) return null;
+      const now = Date.now();
+      const last = this.lastFetchTime.get(factionId) ?? 0;
+      if (now - last < MIN_FETCH_INTERVAL_MS) return null;
+      this.lastFetchTime.set(factionId, now);
+      log$2.debug("Fetching latest from twse.dev");
+      const start = performance.now();
+      return new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: `${TWSE_SERVER_BASE_URL}/faction/${factionId}`,
+          onload: (response) => {
+            if (response.status !== 200) {
+              resolve(null);
+              return;
+            }
+            try {
+              const end = performance.now();
+              log$2.debug(`Received result in ${end - start}ms`);
+              resolve(JSON.parse(response.responseText));
+            } catch (e2) {
+              log$2.error(`Failed to parse response for faction ${factionId}:`, e2);
+              resolve(null);
+            }
+          },
+          onerror: (e2) => {
+            log$2.error(`Failed to fetch latest data for faction ${factionId}:`, e2);
+            resolve(null);
+          }
+        });
+      });
+    }
+subscribe(factionId, onData, userIdHash) {
+      let stopped = false;
+      let retryDelayMs = 1e3;
+      let requestHandle = null;
+      const connect = () => {
+        if (stopped) return;
+        this.activeSseConnections.add(factionId);
+        const url = `${TWSE_SERVER_BASE_URL}/faction/${factionId}/subscribe?user_id_hash=${encodeURIComponent(userIdHash)}&tab_id=${encodeURIComponent(this.tabId)}`;
+        let processedLength = 0;
+        let pending = "";
+        requestHandle = GM_xmlhttpRequest({
+          method: "GET",
+          url,
+          headers: {
+            Accept: "text/event-stream",
+            "Cache-Control": "no-cache"
+          },
+          onprogress: (response) => {
+            const fullText = response.responseText ?? response.response ?? "";
+            const chunk = fullText.slice(processedLength);
+            processedLength = fullText.length;
+            pending += chunk;
+            const parts = pending.split("\n\n");
+            pending = parts.pop() ?? "";
+            for (const eventText of parts) {
+              const dataLine = eventText.split("\n").find((line) => line.startsWith("data:"));
+              if (!dataLine) continue;
+              try {
+                const data = JSON.parse(
+                  dataLine.slice("data:".length).trim()
+                );
+                onData(data);
+                retryDelayMs = 1e3;
+              } catch (e2) {
+                log$2.error("Failed to parse SSE event data:", e2);
+              }
+            }
+          },
+          onerror: () => {
+            requestHandle = null;
+            this.activeSseConnections.delete(factionId);
+            if (!stopped) {
+              log$2.warn(
+                `SSE for faction ${factionId} dropped. Retrying in ${retryDelayMs}ms.`
+              );
+              setTimeout(connect, retryDelayMs);
+              retryDelayMs = Math.min(retryDelayMs * 2, 3e4);
+            }
+          },
+          onabort: () => {
+            requestHandle = null;
+            this.activeSseConnections.delete(factionId);
+          }
+        });
+      };
+      connect();
+      return () => {
+        stopped = true;
+        this.activeSseConnections.delete(factionId);
+        requestHandle?.abort();
+        requestHandle = null;
+      };
+    }
+submit(factionId, payload) {
+      log$2.debug("Sending update to twse server");
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: `${TWSE_SERVER_BASE_URL}/faction/${factionId}/submit`,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify({ ...payload, tab_id: this.tabId }),
+        onerror: (e2) => {
+          log$2.error(
+            `Failed to submit faction ${factionId} data to TWSE Server:`,
+            e2
+          );
+        }
+      });
+    }
+  }
+  const twseClient = new TwseServerClient();
   const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}.members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:9999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}";
   importCSS(stylesCss);
   const log$1 = logger.child("feature:war-monitor");
@@ -1548,6 +1672,10 @@ clearAll() {
         let lastRequestTime = 0;
         const minTimeBetweenRequestsMs = WarMonitorFeature.intervals.minTimeBetweenRequests;
         const activeChains = new Map();
+        const lastAppliedTimestamp = new Map();
+        const sseUnsubscribers = [];
+        let cachedUserIdHashKey = null;
+        let cachedUserIdHash = null;
         let lastChainHtml = "";
         let isDragging = false;
         let _isSorting = false;
@@ -1568,6 +1696,7 @@ clearAll() {
           factionCache.clearAll();
           activeChains.clear();
           unexpectedTransitions.clear();
+          lastAppliedTimestamp.clear();
           updateStatuses();
         };
         window.addEventListener("twse-clear-cache", onClearCache);
@@ -2016,6 +2145,47 @@ clearAll() {
           }
           return " LATE";
         }
+        async function getUserIdHash() {
+          const key = twseconfig.apiKey;
+          if (!key) return null;
+          if (cachedUserIdHashKey === key) return cachedUserIdHash;
+          const encoded = new TextEncoder().encode(key);
+          const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+          const hash = Array.from(new Uint8Array(hashBuffer)).map((b2) => b2.toString(16).padStart(2, "0")).join("");
+          cachedUserIdHashKey = key;
+          cachedUserIdHash = hash;
+          return hash;
+        }
+        function applyFactionData(factionId, data) {
+          if (data.timestamp !== void 0) {
+            const last = lastAppliedTimestamp.get(factionId) ?? 0;
+            if (data.timestamp <= last) return;
+            lastAppliedTimestamp.set(factionId, data.timestamp);
+          }
+          if (data.members) {
+            const reqTime = Date.now();
+            const factionStatus = {};
+            for (const memberData of data.members) {
+              const id = String(memberData.id);
+              const status = memberData.status;
+              status.last_req_time = reqTime;
+              memberStatus.set(id, status);
+              factionStatus[id] = status;
+            }
+            factionCache.set(factionId, factionStatus);
+          }
+          if (data.chain) {
+            activeChains.set(factionId, {
+              current: data.chain.current,
+              max: data.chain.max,
+              timeout: data.chain.timeout,
+              modifier: data.chain.modifier,
+              apiReceivedAt: getCurrentTimeSec(),
+              cooldown: data.chain.cooldown || 0,
+              end: data.chain.end
+            });
+          }
+        }
         async function updateStatuses() {
           if (!running) return;
           const factionIds = getFactionIds();
@@ -2023,6 +2193,7 @@ clearAll() {
           const now = Date.now();
           if (now - lastRequestTime < minTimeBetweenRequestsMs) return;
           lastRequestTime = now;
+          const userIdHash = await getUserIdHash();
           for (const factionId of factionIds) {
             log$1.debug(`Fetching API status update for faction: ${factionId}`);
             const data = await tornApi.fetchFactionData(factionId);
@@ -2037,27 +2208,11 @@ clearAll() {
               }
               continue;
             }
-            if (data.members) {
-              const reqTime = Date.now();
-              const factionStatus = {};
-              for (const memberData of data.members) {
-                const id = String(memberData.id);
-                const status = memberData.status;
-                status.last_req_time = reqTime;
-                memberStatus.set(id, status);
-                factionStatus[id] = status;
-              }
-              factionCache.set(factionId, factionStatus);
-            }
-            if (data.chain) {
-              activeChains.set(factionId, {
-                current: data.chain.current,
-                max: data.chain.max,
-                timeout: data.chain.timeout,
-                modifier: data.chain.modifier,
-                apiReceivedAt: getCurrentTimeSec(),
-                cooldown: data.chain.cooldown || 0,
-                end: data.chain.end
+            applyFactionData(factionId, data);
+            if (userIdHash !== null) {
+              twseClient.submit(factionId, {
+                user_id_hash: userIdHash,
+                torn_response: data
               });
             }
           }
@@ -2445,11 +2600,21 @@ clearAll() {
             watch();
           }
         }, WarMonitorFeature.intervals.watch);
+        const twseInterval = setInterval(async () => {
+          if (!running || !foundWar) return;
+          for (const factionId of getFactionIds()) {
+            const data = await twseClient.fetchLatest(factionId);
+            if (data) applyFactionData(factionId, data);
+          }
+        }, 1e3);
         stopMonitor = () => {
           active = false;
           running = false;
           clearInterval(pollingInterval);
           clearInterval(watchInterval);
+          clearInterval(twseInterval);
+          for (const unsub of sseUnsubscribers) unsub();
+          sseUnsubscribers.length = 0;
           if (descriptionsObserver) {
             descriptionsObserver.disconnect();
           }
@@ -2502,7 +2667,13 @@ clearAll() {
   });
   const Features = Object.values(modules).map((mod) => mod.default).filter((feat) => !!feat && "name" in feat);
   const log = logger.child("boot");
+  const INJECTION_KEY = "data-twse-injected";
   async function boot() {
+    if (document.documentElement.hasAttribute(INJECTION_KEY)) {
+      log.info("Script already injected, skipping boot.");
+      return;
+    }
+    document.documentElement.setAttribute(INJECTION_KEY, "true");
     log.info("Initializing Torn War Stuff Enhanced...");
     for (const feature of Features) {
       try {
