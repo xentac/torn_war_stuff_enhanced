@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta19
+// @version      2.0-beta20
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1493,10 +1493,8 @@ clearAll() {
     constructor() {
       this.tabId = crypto.randomUUID();
       this.lastFetchTime = new Map();
-      this.activeSseConnections = new Set();
     }
 async fetchLatest(factionId) {
-      if (this.activeSseConnections.has(factionId)) return null;
       const now = Date.now();
       const last = this.lastFetchTime.get(factionId) ?? 0;
       if (now - last < MIN_FETCH_INTERVAL_MS) return null;
@@ -1527,69 +1525,6 @@ async fetchLatest(factionId) {
           }
         });
       });
-    }
-subscribe(factionId, onData, userIdHash) {
-      let stopped = false;
-      let retryDelayMs = 1e3;
-      let requestHandle = null;
-      const connect = () => {
-        if (stopped) return;
-        this.activeSseConnections.add(factionId);
-        const url = `${TWSE_SERVER_BASE_URL}/faction/${factionId}/subscribe?user_id_hash=${encodeURIComponent(userIdHash)}&tab_id=${encodeURIComponent(this.tabId)}`;
-        let processedLength = 0;
-        let pending = "";
-        requestHandle = GM_xmlhttpRequest({
-          method: "GET",
-          url,
-          headers: {
-            Accept: "text/event-stream",
-            "Cache-Control": "no-cache"
-          },
-          onprogress: (response) => {
-            const fullText = response.responseText ?? response.response ?? "";
-            const chunk = fullText.slice(processedLength);
-            processedLength = fullText.length;
-            pending += chunk;
-            const parts = pending.split("\n\n");
-            pending = parts.pop() ?? "";
-            for (const eventText of parts) {
-              const dataLine = eventText.split("\n").find((line) => line.startsWith("data:"));
-              if (!dataLine) continue;
-              try {
-                const data = JSON.parse(
-                  dataLine.slice("data:".length).trim()
-                );
-                onData(data);
-                retryDelayMs = 1e3;
-              } catch (e2) {
-                log$2.error("Failed to parse SSE event data:", e2);
-              }
-            }
-          },
-          onerror: () => {
-            requestHandle = null;
-            this.activeSseConnections.delete(factionId);
-            if (!stopped) {
-              log$2.warn(
-                `SSE for faction ${factionId} dropped. Retrying in ${retryDelayMs}ms.`
-              );
-              setTimeout(connect, retryDelayMs);
-              retryDelayMs = Math.min(retryDelayMs * 2, 3e4);
-            }
-          },
-          onabort: () => {
-            requestHandle = null;
-            this.activeSseConnections.delete(factionId);
-          }
-        });
-      };
-      connect();
-      return () => {
-        stopped = true;
-        this.activeSseConnections.delete(factionId);
-        requestHandle?.abort();
-        requestHandle = null;
-      };
     }
 submit(factionId, payload) {
       log$2.debug("Sending update to twse server");
@@ -1673,7 +1608,6 @@ submit(factionId, payload) {
         const minTimeBetweenRequestsMs = WarMonitorFeature.intervals.minTimeBetweenRequests;
         const activeChains = new Map();
         const lastAppliedTimestamp = new Map();
-        const sseUnsubscribers = [];
         let cachedUserIdHashKey = null;
         let cachedUserIdHash = null;
         let lastChainHtml = "";
@@ -2600,21 +2534,34 @@ submit(factionId, payload) {
             watch();
           }
         }, WarMonitorFeature.intervals.watch);
-        const twseInterval = setInterval(async () => {
-          if (!running || !foundWar) return;
-          for (const factionId of getFactionIds()) {
-            const data = await twseClient.fetchLatest(factionId);
-            if (data) applyFactionData(factionId, data);
+        let cacheTimer = null;
+        const queryCache = async () => {
+          if (cacheTimer) {
+            clearTimeout(cacheTimer);
           }
-        }, 1e3);
+          cacheTimer = null;
+          try {
+            if (!running || !foundWar) return;
+            for (const factionId of getFactionIds()) {
+              const data = await twseClient.fetchLatest(factionId);
+              if (data) applyFactionData(factionId, data);
+            }
+          } finally {
+            if (!cacheTimer) {
+              cacheTimer = setTimeout(queryCache, 1e3);
+            }
+          }
+        };
+        queryCache();
         stopMonitor = () => {
           active = false;
           running = false;
           clearInterval(pollingInterval);
           clearInterval(watchInterval);
-          clearInterval(twseInterval);
-          for (const unsub of sseUnsubscribers) unsub();
-          sseUnsubscribers.length = 0;
+          if (cacheTimer) {
+            clearTimeout(cacheTimer);
+            cacheTimer = null;
+          }
           if (descriptionsObserver) {
             descriptionsObserver.disconnect();
           }
