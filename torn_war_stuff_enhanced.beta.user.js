@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta20
+// @version      2.0-beta21
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1576,7 +1576,7 @@ submit(factionId, payload) {
       let active = false;
       let stopMonitor = null;
       const isVisible = () => {
-        return !document.hidden && !document.hasFocus();
+        return !document.hidden && document.hasFocus();
       };
       const startMonitor = async () => {
         if (active) return;
