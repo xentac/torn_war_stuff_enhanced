@@ -478,9 +478,18 @@ async function main() {
     console.log(`Copying ${builtFilePath} to worktree...`);
     copyFileSync(builtFilePath, `${worktreeDir}/${edition.fileName}`);
 
+    // Copy Greasy Fork additional info doc, since GF reads it directly from this branch
+    const additionalInfoPath = "docs/greasyfork-additional-info.md";
+    console.log(`Copying ${additionalInfoPath} to worktree...`);
+    copyFileSync(
+      additionalInfoPath,
+      `${worktreeDir}/greasyfork-additional-info.md`,
+    );
+
     // Commit to the release branch
     console.log("Committing built script and metadata to release branch...");
     runCmd("git", ["-C", worktreeDir, "add", edition.fileName]);
+    runCmd("git", ["-C", worktreeDir, "add", "greasyfork-additional-info.md"]);
 
     // Write release metadata
     const metadataPath = `${worktreeDir}/release-metadata.json`;
