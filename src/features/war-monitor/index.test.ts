@@ -118,10 +118,11 @@ class MockElement {
   appendChild(el: MockElement) {
     if (el.tagName === "FRAGMENT") {
       for (const child of [...el.children]) {
-        child.parentNode = this;
-        this.children.push(child);
+        this.appendChild(child);
       }
+      el.children = [];
     } else {
+      el.remove(); // detach from any current parent first, as real DOM does
       el.parentNode = this;
       this.children.push(el);
     }
@@ -1303,6 +1304,70 @@ describe("WarMonitorFeature Sorting Config", () => {
       expect(
         lis[1]?.querySelector("a[href^='/profiles.php']")?.getAttribute("href"),
       ).toContain("ID=11");
+
+      spy.mockRestore();
+    });
+
+    it("should force a sort on the tick after FF Scouter's active filter clears", async () => {
+      const { tornApi } = await import("@utils/api");
+
+      // DOM order is reversed (31 before 30); a completed Tier B sort
+      // (player_id ascending) would flip them to 30, 31.
+      buildWarDOM([
+        { id: "31", statusClass: "ok", statusText: "Okay" },
+        { id: "30", statusClass: "ok", statusText: "Okay" },
+      ]);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      ul?.setAttribute("data-ffscouter-active-filter", "true");
+
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        members: [
+          {
+            id: 31,
+            name: "Carol",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+          },
+          {
+            id: 30,
+            name: "Dave",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+          },
+        ],
+      });
+
+      const idOrder = () => {
+        const lis = ul?.children.filter((c: any) =>
+          c.className.includes("enemy"),
+        ) as any[];
+        return lis.map(
+          (li) =>
+            li
+              .querySelector("a[href^='/profiles.php']")
+              ?.getAttribute("href")
+              ?.match(/ID=(\d+)/)?.[1],
+        );
+      };
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100); // initial poll
+      await vi.advanceTimersByTimeAsync(500); // tick 1: sort deferred by FF Scouter
+
+      expect(idOrder()).toEqual(["31", "30"]);
+
+      // FF Scouter deactivates its filter.
+      ul?.setAttribute("data-ffscouter-active-filter", "false");
+
+      await vi.advanceTimersByTimeAsync(500); // tick 2: detects the filter cleared
+      expect(idOrder()).toEqual(["31", "30"]);
+
+      await vi.advanceTimersByTimeAsync(500); // tick 3: forced sort runs
+      expect(idOrder()).toEqual(["30", "31"]);
 
       spy.mockRestore();
     });

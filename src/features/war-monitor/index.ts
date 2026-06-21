@@ -1,4 +1,5 @@
 import { tornApi } from "@utils/api";
+import { BatchedDomWriter } from "@utils/batched-dom-writer";
 import { factionCache } from "@utils/cache";
 import { twseconfig } from "@utils/config";
 import {
@@ -132,13 +133,27 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       let pageVisible = isVisible();
       let everSorted = false;
       let ffscouterSortingDeferred = false;
+      // Set when FF Scouter's filter clears, so the NEXT watch() tick forces a
+      // sort even if nothing else changed — we skipped sorting entirely while
+      // the filter was active, so our own sort order may now be stale.
+      let forceSortNextTick = false;
 
       const memberStatus = new Map<string, FactionMemberStatus>();
       const memberLis = new Map<string, MemberLiRef>();
       const unexpectedTransitions = new Map<string, TimestampMs>();
       const okaySinceTimestamps = new Map<string, TornTimestampMs>();
-      const deferredWrites: [Element, string, string][] = [];
-      const deferredStyles: [HTMLElement, string, string][] = [];
+      const domWriter = new BatchedDomWriter({
+        groups: {
+          sort: [
+            "data-until",
+            "data-player_id",
+            "data-sortA",
+            "data-location",
+            "data-okay-since",
+            "data-unexpected-at",
+          ],
+        },
+      });
 
       const UNEXPECTED_HIGHLIGHT_MS =
         WarMonitorFeature.intervals.unexpectedHighlight;
@@ -577,72 +592,6 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         );
       }
 
-      const attrCache = new WeakMap<Element, Record<string, string>>();
-      const styleCache = new WeakMap<HTMLElement, Record<string, string>>();
-      const cacheableAttrs = new Set([
-        "data-until",
-        "data-okay-since",
-        "data-sortA",
-        "data-location",
-        "data-unexpected-at",
-        "data-twse-traveling",
-        "data-twse-highlight",
-        "data-twse-status-differs",
-        "data-twse-overridden",
-      ]);
-
-      // Set attributes with deferred writing to prevent layout thrashing
-      function queueAttrWrite(
-        elem: Element,
-        attr: string,
-        value: string,
-      ): boolean {
-        if (cacheableAttrs.has(attr)) {
-          let cache = attrCache.get(elem);
-          if (!cache) {
-            cache = {};
-            attrCache.set(elem, cache);
-          }
-          if (cache[attr] === undefined) {
-            cache[attr] = elem.getAttribute(attr) || "";
-          }
-          if (cache[attr] !== value) {
-            cache[attr] = value;
-            deferredWrites.push([elem, attr, value]);
-            return true;
-          }
-          return false;
-        }
-
-        if (elem.getAttribute(attr) !== value) {
-          deferredWrites.push([elem, attr, value]);
-          return true;
-        }
-        return false;
-      }
-
-      function queueStyleWrite(elem: HTMLElement, prop: string, value: string) {
-        if (prop === "--twse-content") {
-          let cache = styleCache.get(elem);
-          if (!cache) {
-            cache = {};
-            styleCache.set(elem, cache);
-          }
-          if (cache[prop] === undefined) {
-            cache[prop] = elem.style.getPropertyValue(prop);
-          }
-          if (cache[prop] !== value) {
-            cache[prop] = value;
-            deferredStyles.push([elem, prop, value]);
-          }
-          return;
-        }
-
-        if (elem.style.getPropertyValue(prop) !== value) {
-          deferredStyles.push([elem, prop, value]);
-        }
-      }
-
       function sortMemberList(listElem: Element) {
         let sortedColumn = getSortedColumn(listElem);
         if (!everSorted) {
@@ -889,18 +838,12 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         status: FactionMemberStatus,
         classification: MemberClassification,
         tornNow: TornTimestampMs,
-      ): boolean {
-        let dirty = false;
-
-        if (
-          queueAttrWrite(
-            li,
-            "data-sortA",
-            SORT_GROUP_TO_SORT_A[classification.sortGroup],
-          )
-        ) {
-          dirty = true;
-        }
+      ): void {
+        domWriter.setAttr(
+          li,
+          "data-sortA",
+          SORT_GROUP_TO_SORT_A[classification.sortGroup],
+        );
 
         const isTravelState =
           status.state === "Traveling" || status.state === "Abroad";
@@ -914,7 +857,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
               status.description.split("In ")[1],
             );
             dataLocation = content;
-            queueStyleWrite(statusDiv, "--twse-content", `"${content}"`);
+            domWriter.setStyle(statusDiv, "--twse-content", `"${content}"`);
             overridden = true;
             break;
           }
@@ -922,7 +865,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             if (classification.route) {
               dataLocation = `► ${classification.route.to}`;
               const remaining = calculateFlightTimeRemaining(li);
-              queueStyleWrite(
+              domWriter.setStyle(
                 statusDiv,
                 "--twse-content",
                 `"${dataLocation}${remaining}"`,
@@ -935,7 +878,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             if (classification.route) {
               dataLocation = `◄ ${classification.route.from}`;
               const remaining = calculateFlightTimeRemaining(li);
-              queueStyleWrite(
+              domWriter.setStyle(
                 statusDiv,
                 "--twse-content",
                 `"${dataLocation}${remaining}"`,
@@ -947,7 +890,11 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           case SortGroup.Traveling: {
             if (isTravelState) {
               dataLocation = "Traveling";
-              queueStyleWrite(statusDiv, "--twse-content", `"${dataLocation}"`);
+              domWriter.setStyle(
+                statusDiv,
+                "--twse-content",
+                `"${dataLocation}"`,
+              );
               overridden = true;
             }
             break;
@@ -961,7 +908,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             );
             if (timeRemaining > 0) {
               const timeStr = calc_delta(timeRemaining);
-              queueStyleWrite(statusDiv, "--twse-content", `"${timeStr}"`);
+              domWriter.setStyle(statusDiv, "--twse-content", `"${timeStr}"`);
               overridden = true;
             }
             break;
@@ -970,31 +917,22 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             break;
         }
 
-        if (li.getAttribute("data-location") !== dataLocation) {
-          queueAttrWrite(li, "data-location", dataLocation);
-          dirty = true;
-        }
+        domWriter.setAttr(li, "data-location", dataLocation);
 
         // data-okay-since/data-unexpected-at are the sort epochs sortMemberList's
         // comparator reads; classifyMember owns the decision, this just persists it.
         const okaySince = classification.nextTransitionState.okaySince;
-        if (
-          queueAttrWrite(
-            li,
-            "data-okay-since",
-            okaySince === null ? "" : String(okaySince),
-          )
-        ) {
-          dirty = true;
-        }
+        domWriter.setAttr(
+          li,
+          "data-okay-since",
+          okaySince === null ? "" : String(okaySince),
+        );
 
         const unexpectedAt =
           classification.nextTransitionState.unexpectedSince ?? 0;
-        if (queueAttrWrite(li, "data-unexpected-at", String(unexpectedAt))) {
-          dirty = true;
-        }
+        domWriter.setAttr(li, "data-unexpected-at", String(unexpectedAt));
 
-        queueAttrWrite(
+        domWriter.setAttr(
           statusDiv,
           STATUS_DIFFERS,
           classification.isUnexpectedHighlighted ? "true" : "false",
@@ -1004,36 +942,29 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         // case never touches them, leaving whatever value a prior hospital stint left.
         if (!isTravelState) {
           if (classification.sortGroup === SortGroup.Hospitalized) {
-            queueAttrWrite(
+            domWriter.setAttr(
               statusDiv,
               TRAVELING,
               status.description.includes("In a") ? "true" : "false",
             );
           } else {
-            queueAttrWrite(statusDiv, TRAVELING, "false");
+            domWriter.setAttr(statusDiv, TRAVELING, "false");
           }
-          queueAttrWrite(
+          domWriter.setAttr(
             statusDiv,
             HIGHLIGHT,
             classification.isNearExpiry ? "true" : "false",
           );
         }
 
-        queueAttrWrite(
+        domWriter.setAttr(
           statusDiv,
           "data-twse-overridden",
           overridden ? "true" : "false",
         );
-
-        return dirty;
       }
 
       function watch() {
-        deferredWrites.length = 0;
-        deferredStyles.length = 0;
-
-        let dirtySort = false;
-
         memberLis.forEach((elem, id) => {
           const li = elem.li;
           const statusDiv = elem.statusDiv;
@@ -1041,16 +972,12 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           const status = memberStatus.get(id);
           if (!status || !running) {
-            queueAttrWrite(statusDiv, "data-twse-overridden", "false");
+            domWriter.setAttr(statusDiv, "data-twse-overridden", "false");
             return;
           }
 
-          if (queueAttrWrite(li, "data-until", String(status.until ?? 0))) {
-            dirtySort = true;
-          }
-          if (queueAttrWrite(li, "data-player_id", String(id))) {
-            dirtySort = true;
-          }
+          domWriter.setAttr(li, "data-until", String(status.until ?? 0));
+          domWriter.setAttr(li, "data-player_id", String(id));
 
           const canonicalStatus = parseCanonicalStatus(statusDiv);
           const transitionState: TransitionState = {
@@ -1095,30 +1022,18 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             );
           }
 
-          if (
-            applyClassification(li, statusDiv, status, classification, tornNow)
-          ) {
-            dirtySort = true;
-          }
+          applyClassification(li, statusDiv, status, classification, tornNow);
         });
 
         // Commit all writes at once
-        if (deferredWrites.length > 0) {
-          for (const [elem, attr, val] of deferredWrites) {
-            elem.setAttribute(attr, val);
-          }
-          deferredWrites.length = 0;
-        }
-
-        if (deferredStyles.length > 0) {
-          for (const [elem, prop, val] of deferredStyles) {
-            elem.style.setProperty(prop, val);
-          }
-          deferredStyles.length = 0;
-        }
+        const dirtyGroups = domWriter.flush();
 
         // Handle custom sorting routine
-        if (twseconfig.war_sorting && dirtySort) {
+        if (
+          twseconfig.war_sorting &&
+          (dirtyGroups.has("sort") || forceSortNextTick)
+        ) {
+          forceSortNextTick = false;
           _isSorting = true;
           const memberLists = document.querySelectorAll("ul.members-list");
           for (let i = 0; i < memberLists.length; i++) {
@@ -1142,7 +1057,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           }
           if (!activeFilterFound) {
             ffscouterSortingDeferred = false;
-            dirtySort = true;
+            forceSortNextTick = true;
           }
         }
 
