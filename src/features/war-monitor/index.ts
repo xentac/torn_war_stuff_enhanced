@@ -12,20 +12,28 @@ import {
   calc_delta,
   formatChainCooldown,
   formatChainTimeout,
-  getCurrentTimeSec,
+  getCurrentTime,
 } from "@utils/time";
-import {
-  extract_destinations_from_description,
-  shorten_destination,
-} from "@utils/travel";
+import { shorten_destination } from "@utils/travel";
 import { twseClient } from "@utils/twse-server";
 import type {
+  DurationMs,
+  DurationSec,
   FactionId,
   FactionMemberStatus,
   FactionResponse,
+  TimestampMs,
+  TornTimestampMs,
+  TornTimestampSec,
 } from "@utils/types";
 import "@ui/styles.css";
 import { type Feature, StartTime } from "../feature";
+import type { MemberClassification, TransitionState } from "./classify-member";
+import {
+  classifyMember,
+  parseCanonicalStatus,
+  SortGroup,
+} from "./classify-member";
 
 const log = logger.child("feature:war-monitor");
 
@@ -39,9 +47,9 @@ interface ActiveChainState {
   max: number;
   timeout: number;
   modifier: number;
-  apiReceivedAt: number;
-  cooldown: number;
-  end?: number;
+  apiReceivedAt: TimestampMs;
+  cooldown: TornTimestampSec;
+  end?: TornTimestampSec;
 }
 
 const TRAVELING = "data-twse-traveling";
@@ -64,10 +72,11 @@ function shouldRunMonitor(): boolean {
 
 interface WarMonitorFeatureType extends Feature {
   intervals: {
-    poll: number;
-    watch: number;
-    minTimeBetweenRequests: number;
-    unexpectedHighlight: number;
+    poll: DurationMs;
+    watch: DurationMs;
+    minTimeBetweenRequests: DurationMs;
+    unexpectedHighlight: DurationMs;
+    nearExpiryThresholdSec: DurationSec;
   };
 }
 
@@ -82,6 +91,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
     watch: 500,
     minTimeBetweenRequests: 10_000,
     unexpectedHighlight: 10_000,
+    nearExpiryThresholdSec: 300,
   },
 
   shouldRun(): boolean {
@@ -125,7 +135,8 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       const memberStatus = new Map<string, FactionMemberStatus>();
       const memberLis = new Map<string, MemberLiRef>();
-      const unexpectedTransitions = new Map<string, number>();
+      const unexpectedTransitions = new Map<string, TimestampMs>();
+      const okaySinceTimestamps = new Map<string, TornTimestampMs>();
       const deferredWrites: [Element, string, string][] = [];
       const deferredStyles: [HTMLElement, string, string][] = [];
 
@@ -163,6 +174,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         factionCache.clearAll();
         activeChains.clear();
         unexpectedTransitions.clear();
+        okaySinceTimestamps.clear();
         lastAppliedTimestamp.clear();
         updateStatuses();
       };
@@ -733,18 +745,26 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         const latestArrivalAttr = li.getAttribute("data-latest-arrival");
         if (!earliestArrivalAttr && !latestArrivalAttr) return "";
 
-        const earliestArrival = parseInt(earliestArrivalAttr || "", 10);
-        const latestArrival = parseInt(latestArrivalAttr || "", 10);
+        const earliestArrival: TornTimestampSec = parseInt(
+          earliestArrivalAttr || "",
+          10,
+        );
+        const latestArrival: TornTimestampSec = parseInt(
+          latestArrivalAttr || "",
+          10,
+        );
         if (Number.isNaN(earliestArrival) && Number.isNaN(latestArrival))
           return "";
 
-        const now = getCurrentTimeSec();
-        if (!Number.isNaN(earliestArrival) && earliestArrival > now) {
-          const remaining = Math.round(earliestArrival - now);
+        // data-earliest-arrival/data-latest-arrival are Torn-sourced Unix
+        // timestamps in seconds; convert our ms clock here, at the comparison.
+        const nowSec: TornTimestampSec = getCurrentTime() / 1000;
+        if (!Number.isNaN(earliestArrival) && earliestArrival > nowSec) {
+          const remaining: DurationSec = Math.round(earliestArrival - nowSec);
           return ` ${calc_delta(remaining, false, false)}`;
         }
-        if (!Number.isNaN(latestArrival) && latestArrival > now) {
-          const remaining = Math.round(latestArrival - now);
+        if (!Number.isNaN(latestArrival) && latestArrival > nowSec) {
+          const remaining: DurationSec = Math.round(latestArrival - nowSec);
           return ` <${calc_delta(remaining, false, false)}`;
         }
 
@@ -800,7 +820,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             max: data.chain.max,
             timeout: data.chain.timeout,
             modifier: data.chain.modifier,
-            apiReceivedAt: getCurrentTimeSec(),
+            apiReceivedAt: getCurrentTime(),
             cooldown: data.chain.cooldown || 0,
             end: data.chain.end,
           });
@@ -848,12 +868,171 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       }
 
       // Periodic UI updates (attributes & layout settings)
+      const SORT_GROUP_TO_SORT_A: Record<SortGroup, string> = {
+        [SortGroup.UnexpectedOkay]: "0",
+        [SortGroup.ExpectedOkay]: "1",
+        [SortGroup.Hospitalized]: "2",
+        [SortGroup.Incoming]: "3",
+        [SortGroup.Abroad]: "4",
+        [SortGroup.Outgoing]: "5",
+        [SortGroup.Traveling]: "6",
+      };
+
+      // Applies a MemberClassification decision to the DOM: the sort epoch
+      // attributes sortMemberList's comparator reads, the row's display content,
+      // and the highlight/overridden flags. The literal display text (location
+      // arrows, countdowns) is presentation built here, not part of
+      // classifyMember's decision (see classify-member.ts).
+      function applyClassification(
+        li: HTMLLIElement,
+        statusDiv: HTMLDivElement,
+        status: FactionMemberStatus,
+        classification: MemberClassification,
+        tornNow: TornTimestampMs,
+      ): boolean {
+        let dirty = false;
+
+        if (
+          queueAttrWrite(
+            li,
+            "data-sortA",
+            SORT_GROUP_TO_SORT_A[classification.sortGroup],
+          )
+        ) {
+          dirty = true;
+        }
+
+        const isTravelState =
+          status.state === "Traveling" || status.state === "Abroad";
+
+        let dataLocation = "";
+        let overridden = false;
+
+        switch (classification.sortGroup) {
+          case SortGroup.Abroad: {
+            const content = shorten_destination(
+              status.description.split("In ")[1],
+            );
+            dataLocation = content;
+            queueStyleWrite(statusDiv, "--twse-content", `"${content}"`);
+            overridden = true;
+            break;
+          }
+          case SortGroup.Outgoing: {
+            if (classification.route) {
+              dataLocation = `► ${classification.route.to}`;
+              const remaining = calculateFlightTimeRemaining(li);
+              queueStyleWrite(
+                statusDiv,
+                "--twse-content",
+                `"${dataLocation}${remaining}"`,
+              );
+              overridden = true;
+            }
+            break;
+          }
+          case SortGroup.Incoming: {
+            if (classification.route) {
+              dataLocation = `◄ ${classification.route.from}`;
+              const remaining = calculateFlightTimeRemaining(li);
+              queueStyleWrite(
+                statusDiv,
+                "--twse-content",
+                `"${dataLocation}${remaining}"`,
+              );
+              overridden = true;
+            }
+            break;
+          }
+          case SortGroup.Traveling: {
+            if (isTravelState) {
+              dataLocation = "Traveling";
+              queueStyleWrite(statusDiv, "--twse-content", `"${dataLocation}"`);
+              overridden = true;
+            }
+            break;
+          }
+          case SortGroup.Hospitalized: {
+            // Reuse the same tornNow classifyMember decided isNearExpiry from
+            // (converting ms to seconds here, at the comparison), so the
+            // countdown text and the highlight threshold never disagree.
+            const timeRemaining = Math.round(
+              (status.until ?? 0) - tornNow / 1000,
+            );
+            if (timeRemaining > 0) {
+              const timeStr = calc_delta(timeRemaining);
+              queueStyleWrite(statusDiv, "--twse-content", `"${timeStr}"`);
+              overridden = true;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+
+        if (li.getAttribute("data-location") !== dataLocation) {
+          queueAttrWrite(li, "data-location", dataLocation);
+          dirty = true;
+        }
+
+        // data-okay-since/data-unexpected-at are the sort epochs sortMemberList's
+        // comparator reads; classifyMember owns the decision, this just persists it.
+        const okaySince = classification.nextTransitionState.okaySince;
+        if (
+          queueAttrWrite(
+            li,
+            "data-okay-since",
+            okaySince === null ? "" : String(okaySince),
+          )
+        ) {
+          dirty = true;
+        }
+
+        const unexpectedAt =
+          classification.nextTransitionState.unexpectedSince ?? 0;
+        if (queueAttrWrite(li, "data-unexpected-at", String(unexpectedAt))) {
+          dirty = true;
+        }
+
+        queueAttrWrite(
+          statusDiv,
+          STATUS_DIFFERS,
+          classification.isUnexpectedHighlighted ? "true" : "false",
+        );
+
+        // TRAVELING/HIGHLIGHT are hospital-specific indicators; the Traveling/Abroad
+        // case never touches them, leaving whatever value a prior hospital stint left.
+        if (!isTravelState) {
+          if (classification.sortGroup === SortGroup.Hospitalized) {
+            queueAttrWrite(
+              statusDiv,
+              TRAVELING,
+              status.description.includes("In a") ? "true" : "false",
+            );
+          } else {
+            queueAttrWrite(statusDiv, TRAVELING, "false");
+          }
+          queueAttrWrite(
+            statusDiv,
+            HIGHLIGHT,
+            classification.isNearExpiry ? "true" : "false",
+          );
+        }
+
+        queueAttrWrite(
+          statusDiv,
+          "data-twse-overridden",
+          overridden ? "true" : "false",
+        );
+
+        return dirty;
+      }
+
       function watch() {
         deferredWrites.length = 0;
         deferredStyles.length = 0;
 
         let dirtySort = false;
-        const okaySince = Date.now();
 
         memberLis.forEach((elem, id) => {
           const li = elem.li;
@@ -873,199 +1052,54 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             dirtySort = true;
           }
 
-          let dataLocation = "";
-
-          switch (status.state) {
-            case "Abroad":
-            case "Traveling": {
-              const hasTravelingClass =
-                statusDiv.classList.contains("traveling") ||
-                statusDiv.classList.contains("abroad");
-              if (!hasTravelingClass) {
-                if (statusDiv.textContent === "Okay") {
-                  // Unexpected transition: DOM shows Okay but API snapshot says traveling
-                  if (!unexpectedTransitions.has(id)) {
-                    unexpectedTransitions.set(id, Date.now());
-                  }
-                  if (queueAttrWrite(li, "data-sortA", "0")) {
-                    dirtySort = true;
-                  }
-                }
-                queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-                break;
-              }
-
-              // DOM confirms traveling — clear any unexpected transition flag
-              unexpectedTransitions.delete(id);
-              queueAttrWrite(li, "data-okay-since", "");
-              queueAttrWrite(statusDiv, "data-twse-overridden", "true");
-
-              if (status.description.includes("In ")) {
-                if (queueAttrWrite(li, "data-sortA", "4")) {
-                  dirtySort = true;
-                }
-                const content = shorten_destination(
-                  status.description.split("In ")[1],
-                );
-                dataLocation = content;
-                queueStyleWrite(statusDiv, "--twse-content", `"${content}"`);
-                break;
-              }
-
-              const route = extract_destinations_from_description(
-                status.description,
-              );
-              if (route?.from === "TC") {
-                if (queueAttrWrite(li, "data-sortA", "5")) {
-                  dirtySort = true;
-                }
-                const dest = route.to;
-                dataLocation = `► ${dest}`;
-                const remaining = calculateFlightTimeRemaining(li);
-                queueStyleWrite(
-                  statusDiv,
-                  "--twse-content",
-                  `"${dataLocation}${remaining}"`,
-                );
-              } else if (route?.to === "TC") {
-                if (queueAttrWrite(li, "data-sortA", "3")) {
-                  dirtySort = true;
-                }
-                const dest = route.from;
-                dataLocation = `◄ ${dest}`;
-                const remaining = calculateFlightTimeRemaining(li);
-                queueStyleWrite(
-                  statusDiv,
-                  "--twse-content",
-                  `"${dataLocation}${remaining}"`,
-                );
-              } else {
-                if (queueAttrWrite(li, "data-sortA", "6")) {
-                  dirtySort = true;
-                }
-                dataLocation = "Traveling";
-                queueStyleWrite(
-                  statusDiv,
-                  "--twse-content",
-                  `"${dataLocation}"`,
-                );
-              }
-              break;
-            }
-
-            case "Hospital":
-            case "Jail": {
-              const now = getCurrentTimeSec();
-              const timeRemaining = Math.round((status.until ?? 0) - now);
-
-              const hasHospitalClass =
-                statusDiv.classList.contains("hospital") ||
-                statusDiv.classList.contains("jail");
-              if (!hasHospitalClass) {
-                if (timeRemaining >= 0) {
-                  // Unexpected transition: DOM shows Okay but API snapshot has time remaining
-                  if (!unexpectedTransitions.has(id)) {
-                    unexpectedTransitions.set(id, Date.now());
-                  }
-                  if (queueAttrWrite(li, "data-sortA", "0")) {
-                    dirtySort = true;
-                  }
-                } else {
-                  // Expected exit: timer expired, DOM confirms Okay → Tier B
-                  // Clear any unexpectedTransitions entry that was spuriously set during DOM lag
-                  // at the start of this hospital stint (brief re-hospitalization not caught by DOM)
-                  unexpectedTransitions.delete(id);
-                  // Set sort epoch to hospital expiry time so earlier-expiring members sort above
-                  // later-expiring ones; stable across subsequent polls unlike raw API data
-                  if (
-                    queueAttrWrite(
-                      li,
-                      "data-okay-since",
-                      String((status.until ?? 0) * 1000),
-                    )
-                  ) {
-                    dirtySort = true;
-                  }
-                  if (queueAttrWrite(li, "data-sortA", "1")) {
-                    dirtySort = true;
-                  }
-                }
-                queueAttrWrite(statusDiv, TRAVELING, "false");
-                queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-                queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-                break;
-              }
-
-              // DOM confirms hospital/jail — clear any unexpected transition flag
-              unexpectedTransitions.delete(id);
-              queueAttrWrite(li, "data-okay-since", "");
-              if (queueAttrWrite(li, "data-sortA", "2")) {
-                dirtySort = true;
-              }
-
-              if (status.description.includes("In a")) {
-                queueAttrWrite(statusDiv, TRAVELING, "true");
-              } else {
-                queueAttrWrite(statusDiv, TRAVELING, "false");
-              }
-
-              if (timeRemaining <= 0) {
-                queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-                queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-                break;
-              }
-
-              queueAttrWrite(statusDiv, "data-twse-overridden", "true");
-              const timeStr = calc_delta(timeRemaining);
-              queueStyleWrite(statusDiv, "--twse-content", `"${timeStr}"`);
-
-              if (timeRemaining < 300) {
-                queueAttrWrite(statusDiv, HIGHLIGHT, "true");
-              } else {
-                queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-              }
-              break;
-            }
-
-            default: {
-              // Tier A: API has caught up but member had an unexpected transition this session
-              // Tier B: stable Okay with no unexpected transition
-              const sortAValue = unexpectedTransitions.has(id) ? "0" : "1";
-              if (queueAttrWrite(li, "data-sortA", sortAValue)) {
-                dirtySort = true;
-              }
-              if (sortAValue === "1" && !li.getAttribute("data-okay-since")) {
-                if (queueAttrWrite(li, "data-okay-since", String(okaySince))) {
-                  dirtySort = true;
-                }
-              }
-              queueAttrWrite(statusDiv, TRAVELING, "false");
-              queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-              queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-              break;
-            }
-          }
-
-          if (li.getAttribute("data-location") !== dataLocation) {
-            queueAttrWrite(li, "data-location", dataLocation);
-            dirtySort = true;
-          }
-
-          // Persist unexpected transition timestamp as a sort key on the element
-          const unexpectedAt = unexpectedTransitions.get(id) ?? 0;
-          if (queueAttrWrite(li, "data-unexpected-at", String(unexpectedAt))) {
-            dirtySort = true;
-          }
-
-          // Highlight decays after UNEXPECTED_HIGHLIGHT_MS regardless of API state
-          const isHighlighted =
-            unexpectedAt > 0 &&
-            Date.now() - unexpectedAt < UNEXPECTED_HIGHLIGHT_MS;
-          queueAttrWrite(
-            statusDiv,
-            STATUS_DIFFERS,
-            isHighlighted ? "true" : "false",
+          const canonicalStatus = parseCanonicalStatus(statusDiv);
+          const transitionState: TransitionState = {
+            unexpectedSince: unexpectedTransitions.get(id) ?? null,
+            okaySince: okaySinceTimestamps.get(id) ?? null,
+          };
+          // `browserNow` stamps our own session bookkeeping (transition
+          // timestamps, highlight window) — always Date.now(), never the
+          // Torn-API clock. `tornNow` is only for comparing against
+          // status.until, a Torn API timestamp, so it (and only it) uses Torn
+          // Server Time via getCurrentTime() — both are ms; the seconds
+          // conversion against status.until happens at the comparison site.
+          const browserNow: TimestampMs = Date.now();
+          const tornNow: TornTimestampMs = getCurrentTime();
+          const classification = classifyMember(
+            status,
+            canonicalStatus,
+            transitionState,
+            browserNow,
+            tornNow,
+            {
+              unexpectedHighlightMs: UNEXPECTED_HIGHLIGHT_MS,
+              nearExpiryThresholdSec:
+                WarMonitorFeature.intervals.nearExpiryThresholdSec,
+            },
           );
+
+          if (classification.nextTransitionState.unexpectedSince === null) {
+            unexpectedTransitions.delete(id);
+          } else {
+            unexpectedTransitions.set(
+              id,
+              classification.nextTransitionState.unexpectedSince,
+            );
+          }
+          if (classification.nextTransitionState.okaySince === null) {
+            okaySinceTimestamps.delete(id);
+          } else {
+            okaySinceTimestamps.set(
+              id,
+              classification.nextTransitionState.okaySince,
+            );
+          }
+
+          if (
+            applyClassification(li, statusDiv, status, classification, tornNow)
+          ) {
+            dirtySort = true;
+          }
         });
 
         // Commit all writes at once
@@ -1135,7 +1169,9 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         if (!bodyContainer) return;
 
         let html = "";
-        const now = getCurrentTimeSec();
+        // chain.cooldown/chain.end are Torn-sourced Unix timestamps in
+        // seconds; convert our ms clock here, at the comparison.
+        const nowSec: TornTimestampSec = getCurrentTime() / 1000;
 
         activeChains.forEach((chain) => {
           let formattedTime = "";
@@ -1144,7 +1180,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           if (chain.cooldown > 0) {
             // 1. Cooldown state (Broken chain); cooldown is a Unix timestamp in v2
-            const remainingCooldown = Math.max(0, chain.cooldown - now);
+            const remainingCooldown: DurationSec = Math.max(
+              0,
+              chain.cooldown - nowSec,
+            );
             formattedTime = formatChainCooldown(remainingCooldown);
             timerClass = "cooldown";
             countClass = "cooldown";
@@ -1154,7 +1193,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             timerClass = "okay"; // Default standard okay color
           } else {
             // 3. Active running chain countdown (never use timeout; server strips it)
-            const remaining = chain.end - now;
+            const remaining: DurationSec = chain.end - nowSec;
 
             if (remaining < 0) {
               formattedTime = formatChainTimeout(remaining);

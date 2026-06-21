@@ -1,5 +1,19 @@
+/** A point in time on our local device's clock (Date.now()). Never compare
+ * directly against a Torn-sourced timestamp — they're different clocks. */
 export type TimestampMs = number;
-export type TimestampSec = number;
+
+/** A point in time on Torn's server-synchronized clock — either bridged
+ * locally via getCurrentTime(), or a literal Torn API response field.
+ * Comparable to other Torn timestamps, never to a local TimestampMs. */
+export type TornTimestampMs = number;
+export type TornTimestampSec = number;
+
+/** A span of time, not a point in time. Comparable to other durations of the
+ * same unit, and addable/subtractable to/from a timestamp — but comparing a
+ * duration directly to a timestamp never makes sense. */
+export type DurationMs = number;
+export type DurationSec = number;
+
 export type FactionId = string;
 
 export interface FactionMemberStatus {
@@ -15,7 +29,7 @@ export interface FactionMemberStatus {
     | "Federal"
     | "Unknown";
   description: string;
-  until: TimestampSec | null;
+  until: TornTimestampSec | null;
   last_req_time?: TimestampMs;
 }
 
@@ -25,7 +39,7 @@ export interface FactionMember {
   level: number;
   last_action: {
     status: string;
-    timestamp: TimestampSec;
+    timestamp: TornTimestampSec;
   };
   status: FactionMemberStatus;
 }
@@ -35,14 +49,14 @@ export interface FactionChain {
   max: number;
   timeout: number;
   modifier: number;
-  cooldown: TimestampSec; // v2: Unix timestamp of when cooldown ends (not seconds remaining)
-  end?: TimestampSec;
+  cooldown: TornTimestampSec; // v2: Unix timestamp of when cooldown ends (not seconds remaining)
+  end?: TornTimestampSec;
 }
 
 export interface FactionResponse {
   members?: FactionMember[];
   chain?: FactionChain;
-  timestamp?: TimestampSec;
+  timestamp?: TornTimestampSec;
   error?: {
     code: number;
     error: string;

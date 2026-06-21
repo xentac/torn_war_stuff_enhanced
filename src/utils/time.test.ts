@@ -3,7 +3,7 @@ import {
   calc_delta,
   formatChainCooldown,
   formatChainTimeout,
-  getCurrentTimeSec,
+  getCurrentTime,
   pad_with_zeros,
 } from "./time";
 
@@ -42,15 +42,15 @@ describe("Time Utilities", () => {
     });
   });
 
-  describe("getCurrentTimeSec", () => {
-    it("should fallback to Date.now() / 1000 when getCurrentTimestamp is undefined", () => {
+  describe("getCurrentTime", () => {
+    it("should fallback to Date.now() when getCurrentTimestamp is undefined", () => {
       const originalWindow = global.window;
       // Mock window without getCurrentTimestamp
       global.window = {} as any;
 
-      const before = Date.now() / 1000;
-      const t = getCurrentTimeSec();
-      const after = Date.now() / 1000;
+      const before = Date.now();
+      const t = getCurrentTime();
+      const after = Date.now();
 
       expect(t).toBeGreaterThanOrEqual(before);
       expect(t).toBeLessThanOrEqual(after);
@@ -60,12 +60,12 @@ describe("Time Utilities", () => {
 
     it("should use window.getCurrentTimestamp() when defined", () => {
       const originalWindow = global.window;
-      const mockTimestamp = 1700000000000; // 1700000000 seconds
+      const mockTimestamp = 1700000000000;
       global.window = {
         getCurrentTimestamp: () => mockTimestamp,
       } as any;
 
-      expect(getCurrentTimeSec()).toBe(1700000000);
+      expect(getCurrentTime()).toBe(1700000000000);
 
       global.window = originalWindow;
     });

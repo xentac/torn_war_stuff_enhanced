@@ -26,7 +26,10 @@ _Avoid_: Healed, medded
 
 ### Sort model
 
-**Tier A**: The elevated sub-group within the Okay section — members who have had at least one unexpected transition during the current monitor session. Permanently sorted above Tier B for the session duration, ordered by most-recent unexpected transition first.
+**Sort group**: The category that places a member's row ahead of or behind other rows in the member list, before any within-group tie-break is applied. The member list orders by sort group first: unexpected transitions, then Tier B, then hospitalized/jailed, then the incoming/abroad/outgoing/traveling sub-groups. Tier A and Tier B are the two sort groups used within the Okay section; the remaining sort groups order non-Okay states.
+_Avoid_: Sort tier (too easily confused with Tier A/B specifically), sort bucket
+
+**Tier A**: The elevated sort group within the Okay section — members who have had at least one unexpected transition during the current monitor session. Permanently sorted above Tier B for the session duration, ordered by most-recent unexpected transition first.
 _Avoid_: Highlighted Okay, unexpected Okay
 
 **Tier B**: The stable sub-group within the Okay section — members who have transitioned to Okay only via expected transitions or who were already Okay at monitor start. Ordered by oldest canonical-Okay time first, which preserves initial DOM order for members present at load.
