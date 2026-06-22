@@ -1,16 +1,22 @@
 import logger from "./logger";
-import type { FactionId, FactionMemberStatus } from "./types";
+import type { CachedFactionMembers, FactionId, FactionMember } from "./types";
 
 const log = logger.child("cache");
+
+// Bump whenever the shape of CachedFactionMembers changes, so stale
+// localStorage entries from a previous version are discarded rather than
+// misread. The 10s TTL below would also catch this eventually, but only
+// after a deploy-time window where old-shaped data could otherwise be read.
+const CACHE_VERSION = 1;
 
 export class FactionCache {
   private prefix = "xentac-torn_war_stuff_enhanced-status-";
   private ttlMs = 10_000; // 10 seconds TTL
 
   /**
-   * Retrieves the cached status for a faction.
+   * Retrieves the cached members for a faction.
    */
-  public get(factionId: FactionId): Record<string, FactionMemberStatus> | null {
+  public get(factionId: FactionId): Record<string, FactionMember> | null {
     try {
       const key = `${this.prefix}${factionId}`;
       const cacheStr = localStorage.getItem(key);
@@ -18,8 +24,13 @@ export class FactionCache {
         return null;
       }
 
-      const parsed = JSON.parse(cacheStr);
-      if (!parsed || typeof parsed.timestamp !== "number" || !parsed.status) {
+      const parsed = JSON.parse(cacheStr) as Partial<CachedFactionMembers>;
+      if (
+        !parsed ||
+        typeof parsed.timestamp !== "number" ||
+        !parsed.members ||
+        parsed.version !== CACHE_VERSION
+      ) {
         this.remove(factionId);
         return null;
       }
@@ -30,30 +41,31 @@ export class FactionCache {
         return null;
       }
 
-      return parsed.status as Record<string, FactionMemberStatus>;
+      return parsed.members;
     } catch (e) {
-      log.error(`Error reading cached status for faction ${factionId}:`, e);
+      log.error(`Error reading cached members for faction ${factionId}:`, e);
       this.remove(factionId);
       return null;
     }
   }
 
   /**
-   * Caches the status for a faction.
+   * Caches the members for a faction.
    */
   public set(
     factionId: FactionId,
-    status: Record<string, FactionMemberStatus>,
+    members: Record<string, FactionMember>,
   ): void {
     try {
       const key = `${this.prefix}${factionId}`;
-      const cacheItem = {
+      const cacheItem: CachedFactionMembers = {
+        version: CACHE_VERSION,
         timestamp: Date.now(),
-        status,
+        members,
       };
       localStorage.setItem(key, JSON.stringify(cacheItem));
     } catch (e) {
-      log.error(`Error caching status for faction ${factionId}:`, e);
+      log.error(`Error caching members for faction ${factionId}:`, e);
     }
   }
 

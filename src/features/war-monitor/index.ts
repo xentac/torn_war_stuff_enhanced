@@ -21,6 +21,7 @@ import type {
   DurationMs,
   DurationSec,
   FactionId,
+  FactionMember,
   FactionMemberStatus,
   FactionResponse,
   TimestampMs,
@@ -144,7 +145,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       // the filter was active, so our own sort order may now be stale.
       let forceSortNextTick = false;
 
-      const memberStatus = new Map<string, FactionMemberStatus>();
+      const members = new Map<string, FactionMember>();
       const memberLis = new Map<string, MemberLiRef>();
       const unexpectedTransitions = new Map<string, TimestampMs>();
       const okaySinceTimestamps = new Map<string, TornTimestampMs>();
@@ -191,7 +192,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       const onClearCache = () => {
         log.info("Received twse-clear-cache event. Purging all caches.");
-        memberStatus.clear();
+        members.clear();
         factionCache.clearAll();
         activeChains.clear();
         unexpectedTransitions.clear();
@@ -518,8 +519,8 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         const cached = factionCache.get(factionId);
         if (!cached) return;
 
-        for (const [id, status] of Object.entries(cached)) {
-          memberStatus.set(id, status);
+        for (const [id, member] of Object.entries(cached)) {
+          members.set(id, member);
         }
         log.info(
           `Populated war monitor cache with stored statuses for faction: ${factionId}`,
@@ -677,7 +678,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         return hash;
       }
 
-      // Applies a FactionResponse to memberStatus and activeChains.
+      // Applies a FactionResponse to members and activeChains.
       // Skips data that is not newer than the last applied timestamp for this faction.
       function applyFactionData(
         factionId: FactionId,
@@ -691,18 +692,17 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
         if (data.members) {
           const reqTime = Date.now();
-          const factionStatus: Record<string, FactionMemberStatus> = {};
+          const factionMembers: Record<string, FactionMember> = {};
 
           for (const memberData of data.members) {
             const id = String(memberData.id);
-            const status = memberData.status;
-            status.last_req_time = reqTime;
+            memberData.status.last_req_time = reqTime;
 
-            memberStatus.set(id, status);
-            factionStatus[id] = status;
+            members.set(id, memberData);
+            factionMembers[id] = memberData;
           }
 
-          factionCache.set(factionId, factionStatus);
+          factionCache.set(factionId, factionMembers);
         }
 
         if (data.chain) {
@@ -912,14 +912,20 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           const statusDiv = elem.statusDiv;
           if (!li || !statusDiv) return;
 
-          const status = memberStatus.get(id);
-          if (!status || !running) {
+          const member = members.get(id);
+          if (!member || !running) {
             domWriter.setAttr(statusDiv, "data-twse-overridden", "false");
             return;
           }
+          const status = member.status;
 
           domWriter.setAttr(li, "data-until", String(status.until ?? 0));
           domWriter.setAttr(li, "data-player_id", String(id));
+          domWriter.setAttr(
+            li,
+            "data-twse-last-action-timestamp",
+            String(member.last_action?.timestamp ?? 0),
+          );
 
           const canonicalStatus = parseCanonicalStatus(statusDiv);
           const transitionState: TransitionState = {

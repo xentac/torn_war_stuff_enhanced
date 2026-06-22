@@ -1215,7 +1215,7 @@ describe("WarMonitorFeature Sorting Config", () => {
             id: 5,
             name: "Eve",
             level: 10,
-            last_action: { status: "", timestamp: 0 },
+            last_action: { status: "Offline", timestamp: 12345 },
             status: {
               state: "Hospital",
               description: "In the hospital",
@@ -1235,6 +1235,7 @@ describe("WarMonitorFeature Sorting Config", () => {
         c.className.includes("enemy"),
       ) as any;
       expect(li?.getAttribute("data-sortA")).toBe("0");
+      expect(li?.getAttribute("data-twse-last-action-timestamp")).toBe("12345");
 
       // Simulate DOM updating to show hospital class (member re-hospitalized)
       const statusDiv = li?.children.find((c: any) =>

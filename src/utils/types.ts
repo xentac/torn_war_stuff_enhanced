@@ -63,7 +63,8 @@ export interface FactionResponse {
   };
 }
 
-export interface CachedFactionStatus {
+export interface CachedFactionMembers {
+  version: number;
   timestamp: TimestampMs;
-  status: Record<string, FactionMemberStatus>;
+  members: Record<string, FactionMember>;
 }

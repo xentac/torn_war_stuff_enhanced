@@ -47,4 +47,9 @@ _Avoid_: Hospital highlight, green highlight
 _Avoid_: Collection service, community cache, cache service, API proxy
 
 **Server timestamp**: The `timestamp` field returned by the Torn API v2 `timestamp` selection — a Unix timestamp (seconds) representing when the Torn server generated the response snapshot. The authoritative freshness signal in the community cache: when multiple users have contributed responses, the one with the highest server timestamp is the most recent, regardless of which user contributed it or when.
+
+### Third-party integration
+
+**Published field**: A `data-twse-*` attribute written onto a member row specifically for another script to read, rather than for this script's own sort/render logic. `data-twse-last-action-timestamp` (the Torn API's `last_action.timestamp`, a `TornTimestampSec`, written as a string on the row's `<li>`, `"0"` if absent) is the first example — FF Scouter reads it to filter rows. Unlike the other `data-twse-*` attributes, it has no effect on this script's own sorting or highlighting.
+_Avoid_: Interop attribute, export field
 _Avoid_: API timestamp, request timestamp, response time, client timestamp

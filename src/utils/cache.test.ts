@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FactionCache } from "./cache";
-import type { FactionMemberStatus } from "./types";
+import type { FactionMember } from "./types";
 
 // Setup localStorage polyfill for vitest
 const storageMock: Record<string, string> = {};
@@ -25,11 +25,17 @@ global.localStorage = {
 
 describe("FactionCache", () => {
   let cache: FactionCache;
-  const mockStatus: Record<string, FactionMemberStatus> = {
+  const mockMembers: Record<string, FactionMember> = {
     "123": {
-      state: "Okay",
-      description: "Okay",
-      until: 0,
+      id: 123,
+      name: "Test Member",
+      level: 1,
+      last_action: { status: "Online", timestamp: 0 },
+      status: {
+        state: "Okay",
+        description: "Okay",
+        until: 0,
+      },
     },
   };
 
@@ -43,14 +49,14 @@ describe("FactionCache", () => {
   });
 
   it("should set and retrieve values correctly within TTL", () => {
-    cache.set("123", mockStatus);
+    cache.set("123", mockMembers);
     const retrieved = cache.get("123");
-    expect(retrieved).toEqual(mockStatus);
+    expect(retrieved).toEqual(mockMembers);
   });
 
   it("should return null and clean up if the cache item has expired", () => {
     vi.useFakeTimers();
-    cache.set("123", mockStatus);
+    cache.set("123", mockMembers);
 
     // Advance time by 11 seconds (TTL is 10s)
     vi.advanceTimersByTime(11_000);
@@ -64,7 +70,7 @@ describe("FactionCache", () => {
   });
 
   it("should remove values explicitly", () => {
-    cache.set("123", mockStatus);
+    cache.set("123", mockMembers);
     cache.remove("123");
     expect(cache.get("123")).toBeNull();
   });
@@ -72,22 +78,50 @@ describe("FactionCache", () => {
   it("should clean expired items globally during sweeping", () => {
     vi.useFakeTimers();
 
-    cache.set("1", mockStatus);
-    cache.set("2", mockStatus);
+    cache.set("1", mockMembers);
+    cache.set("2", mockMembers);
 
     // Advance time past TTL
     vi.advanceTimersByTime(11_000);
 
     // Set a new valid item
-    cache.set("3", mockStatus);
+    cache.set("3", mockMembers);
 
     // Run cleanExpired sweep
     cache.cleanExpired();
 
     expect(cache.get("1")).toBeNull();
     expect(cache.get("2")).toBeNull();
-    expect(cache.get("3")).toEqual(mockStatus);
+    expect(cache.get("3")).toEqual(mockMembers);
 
     vi.useRealTimers();
+  });
+
+  it("should discard cached data from an old, unversioned schema", () => {
+    const key = "xentac-torn_war_stuff_enhanced-status-123";
+    // Pre-dates the version field added alongside the switch from
+    // FactionMemberStatus to FactionMember in the cache.
+    localStorage.setItem(
+      key,
+      JSON.stringify({ timestamp: Date.now(), status: mockMembers }),
+    );
+
+    expect(cache.get("123")).toBeNull();
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it("should discard cached data from a mismatched version", () => {
+    const key = "xentac-torn_war_stuff_enhanced-status-123";
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        version: -1,
+        timestamp: Date.now(),
+        members: mockMembers,
+      }),
+    );
+
+    expect(cache.get("123")).toBeNull();
+    expect(localStorage.getItem(key)).toBeNull();
   });
 });
