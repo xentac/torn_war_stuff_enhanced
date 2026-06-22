@@ -35,6 +35,12 @@ import {
   parseCanonicalStatus,
   SortGroup,
 } from "./classify-member";
+import {
+  getFactionIds,
+  getMemberLists,
+  getMemberRows,
+  getSortedColumn,
+} from "./torn-war-page";
 
 const log = logger.child("feature:war-monitor");
 
@@ -502,82 +508,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       // Extract faction member list details
       function extractAllMemberLis() {
         memberLis.clear();
-        const memberLists = document.querySelectorAll("ul.members-list");
-        memberLists.forEach((ul) => {
-          const lis = ul.querySelectorAll<HTMLLIElement>("li.enemy, li.your");
-          lis.forEach((li) => {
-            const atag = li.querySelector<HTMLAnchorElement>(
-              "a[href^='/profiles.php']",
-            );
-            if (!atag) return;
-            const parts = atag.href.split("ID=");
-            if (parts.length <= 1) return;
-            const id = parts[1];
-            memberLis.set(id, {
-              li,
-              statusDiv: li.querySelector<HTMLDivElement>("div.status"),
-            });
-            injectCopyButton(id, li);
-          });
-        });
-      }
-
-      function getFactionIds(): string[] {
-        const memberLists = document.querySelectorAll("ul.members-list");
-        const ids: string[] = [];
-        memberLists.forEach((elem) => {
-          const q = elem.querySelector<HTMLAnchorElement>(
-            "a[href^='/factions.php']",
-          );
-          if (!q) return;
-          const s = q.href.split("ID=");
-          if (s.length <= 1) return;
-          const id = s[1];
-          if (id) {
-            ids.push(id);
-          }
-        });
-        return ids;
-      }
-
-      interface SortedColumn {
-        column: "member" | "level" | "points" | "status" | null;
-        order: "asc" | "desc" | null;
-      }
-
-      function getSortedColumn(memberList: Element): SortedColumn {
-        const parent = memberList.parentNode as HTMLElement | null;
-        if (!parent) return { column: null, order: null };
-
-        const memberDiv = parent.querySelector("div.member div");
-        const levelDiv = parent.querySelector("div.level div");
-        const pointsDiv = parent.querySelector("div.points div");
-        const statusDiv = parent.querySelector("div.status div");
-
-        let column: "member" | "level" | "points" | "status" | null = null;
-        let classname = "";
-
-        if (memberDiv?.className.includes("activeIcon__")) {
-          column = "member";
-          classname = memberDiv.className;
-        } else if (levelDiv?.className.includes("activeIcon__")) {
-          column = "level";
-          classname = levelDiv.className;
-        } else if (pointsDiv?.className.includes("activeIcon__")) {
-          column = "points";
-          classname = pointsDiv.className;
-        } else if (statusDiv?.className.includes("activeIcon__")) {
-          column = "status";
-          classname = statusDiv.className;
+        for (const row of getMemberRows()) {
+          memberLis.set(row.id, { li: row.li, statusDiv: row.statusDiv });
+          injectCopyButton(row.id, row.li);
         }
-
-        const order = classname.includes("asc__") ? "asc" : "desc";
-
-        if (column && (column !== "points" || order !== "desc")) {
-          everSorted = true;
-        }
-
-        return { column, order };
       }
 
       function populateCachedStatus(factionId: string) {
@@ -594,6 +528,14 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       function sortMemberList(listElem: Element) {
         let sortedColumn = getSortedColumn(listElem);
+        // getSortedColumn is a pure read (torn-war-page.ts); this feature owns
+        // everSorted, so it decides for itself whether this result flips it.
+        if (
+          sortedColumn.column &&
+          (sortedColumn.column !== "points" || sortedColumn.order !== "desc")
+        ) {
+          everSorted = true;
+        }
         if (!everSorted) {
           sortedColumn = { column: "status", order: "asc" };
         }
@@ -672,7 +614,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         for (const obs of memberListObservers) obs.disconnect();
         memberListObservers.length = 0;
 
-        const memberLists = document.querySelectorAll("ul.members-list");
+        const memberLists = getMemberLists();
         for (let i = 0; i < memberLists.length; i++) {
           const ul = memberLists[i];
           const obs = observeElement(
@@ -1035,7 +977,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         ) {
           forceSortNextTick = false;
           _isSorting = true;
-          const memberLists = document.querySelectorAll("ul.members-list");
+          const memberLists = getMemberLists();
           for (let i = 0; i < memberLists.length; i++) {
             sortMemberList(memberLists[i]);
           }
@@ -1044,7 +986,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
         // If FF Scouter sorted our stuff but is no longer actively doing so, we should force a sort in next watch cycle
         if (ffscouterSortingDeferred) {
-          const memberLists = document.querySelectorAll("ul.members-list");
+          const memberLists = getMemberLists();
           let activeFilterFound = false;
           for (let i = 0; i < memberLists.length; i++) {
             if (

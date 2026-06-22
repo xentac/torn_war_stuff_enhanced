@@ -521,7 +521,7 @@ describe("WarMonitorFeature Sorting Config", () => {
     memberCol.className = "member";
 
     const atag = new MockElement("a");
-    atag.setAttribute("href", "/profiles.php?ID=12345");
+    atag.setAttribute("href", "/profiles.php?XID=12345");
     atag.textContent = "Astrobelt";
 
     const statusDiv = new MockElement("div");
@@ -1171,7 +1171,7 @@ describe("WarMonitorFeature Sorting Config", () => {
         memberDiv.className = "member";
 
         const atag = new MockElement("a");
-        atag.setAttribute("href", `/profiles.php?ID=${m.id}`);
+        atag.setAttribute("href", `/profiles.php?XID=${m.id}`);
         memberDiv.appendChild(atag);
 
         const statusDiv = new MockElement("div");
