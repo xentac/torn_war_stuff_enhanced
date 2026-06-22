@@ -1094,6 +1094,20 @@ describe("WarMonitorFeature Sorting Config", () => {
       documentMock.body = new MockElement("body");
       twseconfig.bubble_enabled = true;
       twseconfig.copy_button_enabled = true;
+
+      // Minimal DOM so waitForElement("#faction_war_list_id") resolves
+      // immediately, letting startMonitor() reach its stopMonitor
+      // assignment — required for the outer afterEach's navigate-away
+      // cleanup to actually remove this test's listeners (focus/blur
+      // among them, registered unconditionally per ADR-0007).
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+      documentMock.body.appendChild(factionWarList);
+
+      global.MutationObserver = class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      } as any;
     });
 
     it("should toggle appropriate body classes when configuration is changed", async () => {
@@ -1142,6 +1156,93 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       expect(clearSpy).toHaveBeenCalled();
       clearSpy.mockRestore();
+    });
+  });
+
+  describe("Window Focus Gating (ADR-0007)", () => {
+    beforeEach(() => {
+      localStorage.clear();
+      documentMock.body = new MockElement("body");
+      documentMock.documentElement = new MockElement("html");
+      documentMock.hasFocus = () => true;
+      documentMock.hidden = false;
+      (global.window as any).flutter_inappwebview = undefined;
+
+      // Minimal DOM so waitForElement("#faction_war_list_id") resolves
+      // immediately, letting startMonitor() reach its stopMonitor
+      // assignment — required for the outer afterEach's navigate-away
+      // cleanup to actually remove this test's listeners.
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+      documentMock.body.appendChild(factionWarList);
+
+      global.MutationObserver = class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      } as any;
+    });
+
+    it("starts focused and toggles the class on window blur/focus", async () => {
+      WarMonitorFeature.run();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(documentMock.documentElement.className).toContain(
+        "twse-window-focused",
+      );
+
+      global.window.dispatchEvent(new Event("blur"));
+      expect(documentMock.documentElement.className).not.toContain(
+        "twse-window-focused",
+      );
+
+      global.window.dispatchEvent(new Event("focus"));
+      expect(documentMock.documentElement.className).toContain(
+        "twse-window-focused",
+      );
+    });
+
+    it("starts unfocused when document.hasFocus() is false at startup", async () => {
+      documentMock.hasFocus = () => false;
+
+      WarMonitorFeature.run();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(documentMock.documentElement.className).not.toContain(
+        "twse-window-focused",
+      );
+    });
+
+    it("uses tab visibility instead of focus/blur on Torn PDA", async () => {
+      (global.window as any).flutter_inappwebview = {
+        callHandler: vi.fn(),
+      };
+      documentMock.hidden = false;
+
+      WarMonitorFeature.run();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(documentMock.documentElement.className).toContain(
+        "twse-window-focused",
+      );
+
+      // PDA ignores focus/blur entirely — its events are stuck until tap.
+      global.window.dispatchEvent(new Event("blur"));
+      expect(documentMock.documentElement.className).toContain(
+        "twse-window-focused",
+      );
+
+      // visibilitychange drives the class instead, on PDA.
+      documentMock.hidden = true;
+      documentMock.dispatchEvent({ type: "visibilitychange" });
+      expect(documentMock.documentElement.className).not.toContain(
+        "twse-window-focused",
+      );
+
+      documentMock.hidden = false;
+      documentMock.dispatchEvent({ type: "visibilitychange" });
+      expect(documentMock.documentElement.className).toContain(
+        "twse-window-focused",
+      );
     });
   });
 

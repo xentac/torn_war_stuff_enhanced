@@ -114,6 +114,15 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       return !document.hidden;
     };
 
+    // Torn PDA's focus/blur events don't update until the user taps the
+    // screen (the same defect as the hasFocus() check removed in 0bd5286).
+    // Fixed in Torn PDA's dev branch but not yet shipped to stable — remove
+    // this check (and its uses below) once that fix reaches stable.
+    const isTornPda = () =>
+      typeof window !== "undefined" &&
+      !!(window as any).flutter_inappwebview &&
+      typeof (window as any).flutter_inappwebview.callHandler === "function";
+
     const startMonitor = async () => {
       if (active) return;
       active = true;
@@ -138,6 +147,19 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       let running = true;
       let foundWar = false;
       let pageVisible = isVisible();
+      const onTornPda = isTornPda();
+      // The unexpected-transition highlight is gated on window focus, not
+      // just tab visibility (ADR-0007) — Torn's scripting rules forbid using
+      // data extracted from an unfocused window to draw attention to itself.
+      // On Torn PDA, tab visibility substitutes for focus (see isTornPda).
+      let windowFocused = onTornPda ? !document.hidden : document.hasFocus();
+      const updateWindowFocusClass = () => {
+        document.documentElement.classList.toggle(
+          "twse-window-focused",
+          windowFocused,
+        );
+      };
+      updateWindowFocusClass();
       let everSorted = false;
       let ffscouterSortingDeferred = false;
       // Set when FF Scouter's filter clears, so the NEXT watch() tick forces a
@@ -406,8 +428,29 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       // Listen for visibility updates
       const onVisibilityChange = () => {
         pageVisible = isVisible();
+        // Temporary Torn PDA substitute for focus tracking — see the
+        // isTornPda comment above for why and when to remove this branch.
+        if (onTornPda) {
+          windowFocused = !document.hidden;
+          updateWindowFocusClass();
+        }
       };
       document.addEventListener("visibilitychange", onVisibilityChange);
+
+      // Listen for window focus changes (ADR-0007). Skipped on Torn PDA,
+      // which substitutes tab visibility above instead.
+      const onWindowFocus = () => {
+        windowFocused = true;
+        updateWindowFocusClass();
+      };
+      const onWindowBlur = () => {
+        windowFocused = false;
+        updateWindowFocusClass();
+      };
+      if (!onTornPda) {
+        window.addEventListener("focus", onWindowFocus);
+        window.addEventListener("blur", onWindowBlur);
+      }
 
       async function copyToClipboard(text: string): Promise<boolean> {
         // 1. Try Torn PDA handler if present
@@ -1279,6 +1322,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         window.removeEventListener("twse-clear-cache", onClearCache);
         window.removeEventListener("resize", clampToScreen);
         document.removeEventListener("visibilitychange", onVisibilityChange);
+        if (!onTornPda) {
+          window.removeEventListener("focus", onWindowFocus);
+          window.removeEventListener("blur", onWindowBlur);
+        }
 
         // 4. Remove UI/DOM elements
         if (bubbleContainer) {

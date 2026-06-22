@@ -1,0 +1,5 @@
+# Unexpected-transition highlight is focus-gated via CSS, not the detection pipeline
+
+Torn's scripting rules forbid extracting data from an unfocused page to draw attention to the window. The unexpected-transition highlight (orange background) is exactly that kind of signal, so it's suppressed via CSS while the window lacks OS focus (`window` `focus`/`blur`; Torn PDA uses `document.hidden` as a temporary proxy until its dev-branch focus fix reaches stable — see the comment at the PDA branch in `index.ts` for removal conditions).
+
+Classification, `data-unexpected-at`, and Tier A sort elevation keep running in the background regardless of focus — only the visual highlight color is gated. We chose this over also gating `watch()` itself (mirroring the existing `pageVisible` gate) to keep the change scoped to CSS plus a focus signal, accepting that a member's row can still be sorted to the top of the list while the window was blurred, becoming visible via position rather than color the moment focus returns.

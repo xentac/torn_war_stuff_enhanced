@@ -35,7 +35,7 @@ _Avoid_: Highlighted Okay, unexpected Okay
 **Tier B**: The stable sub-group within the Okay section — members who have transitioned to Okay only via expected transitions or who were already Okay at monitor start. Ordered by oldest canonical-Okay time first, which preserves initial DOM order for members present at load.
 _Avoid_: Normal Okay, baseline Okay
 
-**Unexpected-transition highlight**: The orange row background (`data-twse-status-differs="true"`) applied to a Tier A member while their unexpected transition is recent (within the highlight window). Expiry is purely visual — it does not change sort position or Tier membership. Distinct from the near-expiry highlight.
+**Unexpected-transition highlight**: The orange row background (`data-twse-status-differs="true"`) applied to a Tier A member while their unexpected transition is recent (within the highlight window) and the window has focus (Torn scripting rules forbid drawing attention to an unfocused window using extracted data — ADR-0007). Expiry is purely visual — it does not change sort position or Tier membership. Distinct from the near-expiry highlight.
 _Avoid_: Flag, badge, status-differs highlight
 
 **Near-expiry highlight**: The green row background (`data-twse-highlight="true"`) applied to a hospitalized member whose timer is under 5 minutes. Indicates imminent return to Okay.

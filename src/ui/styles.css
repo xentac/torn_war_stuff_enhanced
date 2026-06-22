@@ -2,7 +2,12 @@
   background-color: #99eb99 !important;
 }
 
-.members-list li:has(div.status[data-twse-status-differs="true"]) {
+/* Torn scripting rules forbid drawing attention to an unfocused window using
+   extracted data (ADR-0007), so this highlight only shows while the window
+   has focus. */
+:root.twse-window-focused
+  .members-list
+  li:has(div.status[data-twse-status-differs="true"]) {
   background-color: #c4974c !important;
 }
 
@@ -14,7 +19,7 @@
   background-color: #446944 !important;
 }
 
-:root
+:root.twse-window-focused
   .dark-mode
   .members-list
   li:has(div.status[data-twse-status-differs="true"]) {
