@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta22
+// @version      2.0-beta23
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1311,7 +1311,84 @@ isRateLimitError(errorCode) {
     }
   }
   const tornApi = new TornApiClient();
+  class BatchedDomWriter {
+    constructor(config) {
+      this.attrCache = new WeakMap();
+      this.styleCache = new WeakMap();
+      this.deferredWrites = [];
+      this.deferredStyles = [];
+      this.groupsByAttr = new Map();
+      this.dirtyGroups = new Set();
+      for (const [groupName, attrs] of Object.entries(config.groups)) {
+        for (const attr of attrs) {
+          let groups = this.groupsByAttr.get(attr);
+          if (!groups) {
+            groups = new Set();
+            this.groupsByAttr.set(attr, groups);
+          }
+          groups.add(groupName);
+        }
+      }
+    }
+    setAttr(element, attr, value) {
+      const cache = this.cacheFor(
+        this.attrCache,
+        element,
+        attr,
+        () => element.getAttribute(attr) ?? ""
+      );
+      if (cache[attr] === value) {
+        return false;
+      }
+      cache[attr] = value;
+      this.deferredWrites.push([element, attr, value]);
+      for (const groupName of this.groupsByAttr.get(attr) ?? []) {
+        this.dirtyGroups.add(groupName);
+      }
+      return true;
+    }
+    setStyle(element, prop, value) {
+      const cache = this.cacheFor(
+        this.styleCache,
+        element,
+        prop,
+        () => element.style.getPropertyValue(prop)
+      );
+      if (cache[prop] === value) {
+        return;
+      }
+      cache[prop] = value;
+      this.deferredStyles.push([element, prop, value]);
+    }
+
+
+cacheFor(cacheMap, element, key, readLiveValue) {
+      let cache = cacheMap.get(element);
+      if (!cache) {
+        cache = {};
+        cacheMap.set(element, cache);
+      }
+      if (cache[key] === void 0) {
+        cache[key] = readLiveValue();
+      }
+      return cache;
+    }
+    flush() {
+      for (const [element, attr, value] of this.deferredWrites) {
+        element.setAttribute(attr, value);
+      }
+      this.deferredWrites = [];
+      for (const [element, prop, value] of this.deferredStyles) {
+        element.style.setProperty(prop, value);
+      }
+      this.deferredStyles = [];
+      const dirtyGroups = this.dirtyGroups;
+      this.dirtyGroups = new Set();
+      return dirtyGroups;
+    }
+  }
   const log$3 = logger.child("cache");
+  const CACHE_VERSION = 1;
   class FactionCache {
     constructor() {
       this.prefix = "xentac-torn_war_stuff_enhanced-status-";
@@ -1326,7 +1403,7 @@ get(factionId) {
           return null;
         }
         const parsed = JSON.parse(cacheStr);
-        if (!parsed || typeof parsed.timestamp !== "number" || !parsed.status) {
+        if (!parsed || typeof parsed.timestamp !== "number" || !parsed.members || parsed.version !== CACHE_VERSION) {
           this.remove(factionId);
           return null;
         }
@@ -1335,23 +1412,24 @@ get(factionId) {
           this.remove(factionId);
           return null;
         }
-        return parsed.status;
+        return parsed.members;
       } catch (e2) {
-        log$3.error(`Error reading cached status for faction ${factionId}:`, e2);
+        log$3.error(`Error reading cached members for faction ${factionId}:`, e2);
         this.remove(factionId);
         return null;
       }
     }
-set(factionId, status) {
+set(factionId, members) {
       try {
         const key = `${this.prefix}${factionId}`;
         const cacheItem = {
+          version: CACHE_VERSION,
           timestamp: Date.now(),
-          status
+          members
         };
         localStorage.setItem(key, JSON.stringify(cacheItem));
       } catch (e2) {
-        log$3.error(`Error caching status for faction ${factionId}:`, e2);
+        log$3.error(`Error caching members for faction ${factionId}:`, e2);
       }
     }
 remove(factionId) {
@@ -1414,15 +1492,15 @@ clearAll() {
     }
   }
   const factionCache = new FactionCache();
-  function getCurrentTimeSec() {
+  function getCurrentTime() {
     const w = window;
     if (typeof w.getCurrentTimestamp === "function") {
       try {
-        return w.getCurrentTimestamp() / 1e3;
+        return w.getCurrentTimestamp();
       } catch (_e) {
       }
     }
-    return Date.now() / 1e3;
+    return Date.now();
   }
   function pad_with_zeros(n3) {
     if (n3 < 10) {
@@ -1545,6 +1623,235 @@ submit(factionId, payload) {
   const twseClient = new TwseServerClient();
   const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}.members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:9999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}";
   importCSS(stylesCss);
+  var SortGroup = ((SortGroup2) => {
+    SortGroup2["UnexpectedOkay"] = "UnexpectedOkay";
+    SortGroup2["ExpectedOkay"] = "ExpectedOkay";
+    SortGroup2["Hospitalized"] = "Hospitalized";
+    SortGroup2["Incoming"] = "Incoming";
+    SortGroup2["Abroad"] = "Abroad";
+    SortGroup2["Outgoing"] = "Outgoing";
+    SortGroup2["Traveling"] = "Traveling";
+    return SortGroup2;
+  })(SortGroup || {});
+  function parseCanonicalStatus(statusDiv) {
+    if (statusDiv.classList.contains("traveling") || statusDiv.classList.contains("abroad")) {
+      return "Traveling";
+    }
+    if (statusDiv.classList.contains("hospital") || statusDiv.classList.contains("jail")) {
+      return "HospitalOrJail";
+    }
+    if (statusDiv.textContent === "Okay") {
+      return "Okay";
+    }
+    return "Unknown";
+  }
+  function classifyMember(status, canonicalStatus, transitionState, browserNow, tornNow, config) {
+    let decision;
+    if (status.state === "Hospital" || status.state === "Jail") {
+      decision = classifyHospitalOrJail(
+        status,
+        canonicalStatus,
+        transitionState,
+        browserNow,
+        tornNow,
+        config.nearExpiryThresholdSec
+      );
+    } else if (status.state === "Traveling" || status.state === "Abroad") {
+      decision = classifyTraveling(
+        status,
+        canonicalStatus,
+        transitionState,
+        browserNow
+      );
+    } else {
+      decision = classifyOkay(transitionState, browserNow);
+    }
+    return {
+      ...decision,
+      isUnexpectedHighlighted: isUnexpectedHighlighted(
+        decision.nextTransitionState,
+        browserNow,
+        config
+      )
+    };
+  }
+  function classifyOkay(transitionState, browserNow) {
+    const sortGroup = carryForwardSortGroup(transitionState);
+    const okaySince = sortGroup === "ExpectedOkay" && transitionState.okaySince === null ? browserNow : transitionState.okaySince;
+    return {
+      sortGroup,
+      route: null,
+      nextTransitionState: {
+        unexpectedSince: transitionState.unexpectedSince,
+        okaySince
+      },
+      isNearExpiry: false
+    };
+  }
+  function classifyHospitalOrJail(status, canonicalStatus, transitionState, browserNow, tornNow, nearExpiryThresholdSec) {
+    const timeRemainingSec = Math.round(
+      (status.until ?? 0) - tornNow / 1e3
+    );
+    if (canonicalStatus === "HospitalOrJail") {
+      return {
+        sortGroup: "Hospitalized",
+        route: null,
+        nextTransitionState: { unexpectedSince: null, okaySince: null },
+        isNearExpiry: timeRemainingSec > 0 && timeRemainingSec < nearExpiryThresholdSec
+      };
+    }
+    if (timeRemainingSec >= 0) {
+      return {
+        sortGroup: "UnexpectedOkay",
+        route: null,
+        nextTransitionState: {
+          unexpectedSince: transitionState.unexpectedSince ?? browserNow,
+          okaySince: transitionState.okaySince
+        },
+        isNearExpiry: false
+      };
+    }
+    return {
+      sortGroup: "ExpectedOkay",
+      route: null,
+      nextTransitionState: {
+        unexpectedSince: null,
+        okaySince: (status.until ?? 0) * 1e3
+      },
+      isNearExpiry: false
+    };
+  }
+  function classifyTraveling(status, canonicalStatus, transitionState, browserNow) {
+    if (canonicalStatus === "Traveling") {
+      const nextTransitionState = {
+        unexpectedSince: null,
+        okaySince: null
+      };
+      if (status.description.includes("In ")) {
+        return {
+          sortGroup: "Abroad",
+          route: null,
+          nextTransitionState,
+          isNearExpiry: false
+        };
+      }
+      const route = extract_destinations_from_description(status.description);
+      if (route?.from === "TC") {
+        return {
+          sortGroup: "Outgoing",
+          route,
+          nextTransitionState,
+          isNearExpiry: false
+        };
+      }
+      if (route?.to === "TC") {
+        return {
+          sortGroup: "Incoming",
+          route,
+          nextTransitionState,
+          isNearExpiry: false
+        };
+      }
+      return {
+        sortGroup: "Traveling",
+        route: route ?? null,
+        nextTransitionState,
+        isNearExpiry: false
+      };
+    }
+    if (canonicalStatus === "Okay") {
+      return {
+        sortGroup: "UnexpectedOkay",
+        route: null,
+        nextTransitionState: {
+          unexpectedSince: transitionState.unexpectedSince ?? browserNow,
+          okaySince: transitionState.okaySince
+        },
+        isNearExpiry: false
+      };
+    }
+    return {
+      sortGroup: carryForwardSortGroup(transitionState),
+      route: null,
+      nextTransitionState: transitionState,
+      isNearExpiry: false
+    };
+  }
+  function carryForwardSortGroup(transitionState) {
+    return transitionState.unexpectedSince ? "UnexpectedOkay" : "ExpectedOkay";
+  }
+  function isUnexpectedHighlighted(transitionState, browserNow, config) {
+    return transitionState.unexpectedSince !== null && browserNow - transitionState.unexpectedSince < config.unexpectedHighlightMs;
+  }
+  function getMemberLists() {
+    return Array.from(document.querySelectorAll("ul.members-list"));
+  }
+  function getFactionIds() {
+    const ids = [];
+    for (const list of getMemberLists()) {
+      const anchor = list.querySelector(
+        "a[href^='/factions.php']"
+      );
+      if (!anchor) continue;
+      const id = parseHrefParam(anchor, "ID");
+      if (id) ids.push(id);
+    }
+    return ids;
+  }
+  function getMemberRows() {
+    const rows = [];
+    for (const list of getMemberLists()) {
+      const lis = list.querySelectorAll("li.enemy, li.your");
+      for (const li of Array.from(lis)) {
+        const anchor = li.querySelector(
+          "a[href^='/profiles.php']"
+        );
+        if (!anchor) continue;
+        const id = parseHrefParam(anchor, "XID");
+        if (!id) continue;
+        rows.push({
+          id,
+          li,
+          statusDiv: li.querySelector("div.status")
+        });
+      }
+    }
+    return rows;
+  }
+  function getSortedColumn(memberList) {
+    const parent = memberList.parentNode;
+    if (!parent) return { column: null, order: null };
+    const memberDiv = parent.querySelector("div.member div");
+    const levelDiv = parent.querySelector("div.level div");
+    const pointsDiv = parent.querySelector("div.points div");
+    const statusDiv = parent.querySelector("div.status div");
+    let column = null;
+    let classname = "";
+    if (memberDiv?.className.includes("activeIcon__")) {
+      column = "member";
+      classname = memberDiv.className;
+    } else if (levelDiv?.className.includes("activeIcon__")) {
+      column = "level";
+      classname = levelDiv.className;
+    } else if (pointsDiv?.className.includes("activeIcon__")) {
+      column = "points";
+      classname = pointsDiv.className;
+    } else if (statusDiv?.className.includes("activeIcon__")) {
+      column = "status";
+      classname = statusDiv.className;
+    }
+    const order = column ? classname.includes("asc__") ? "asc" : "desc" : null;
+    return { column, order };
+  }
+  function parseHrefParam(anchor, paramName) {
+    try {
+      return new URL(anchor.href, "https://www.torn.com").searchParams.get(
+        paramName
+      );
+    } catch {
+      return null;
+    }
+  }
   const log$1 = logger.child("feature:war-monitor");
   const TRAVELING = "data-twse-traveling";
   const HIGHLIGHT = "data-twse-highlight";
@@ -1567,7 +1874,8 @@ submit(factionId, payload) {
       poll: 1e4,
       watch: 500,
       minTimeBetweenRequests: 1e4,
-      unexpectedHighlight: 1e4
+      unexpectedHighlight: 1e4,
+      nearExpiryThresholdSec: 300
     },
     shouldRun() {
       return window.location.href.includes("factions.php");
@@ -1598,11 +1906,23 @@ submit(factionId, payload) {
         let pageVisible = isVisible();
         let everSorted = false;
         let ffscouterSortingDeferred = false;
-        const memberStatus = new Map();
+        let forceSortNextTick = false;
+        const members = new Map();
         const memberLis = new Map();
         const unexpectedTransitions = new Map();
-        const deferredWrites = [];
-        const deferredStyles = [];
+        const okaySinceTimestamps = new Map();
+        const domWriter = new BatchedDomWriter({
+          groups: {
+            sort: [
+              "data-until",
+              "data-player_id",
+              "data-sortA",
+              "data-location",
+              "data-okay-since",
+              "data-unexpected-at"
+            ]
+          }
+        });
         const UNEXPECTED_HIGHLIGHT_MS = WarMonitorFeature.intervals.unexpectedHighlight;
         let lastRequestTime = 0;
         const minTimeBetweenRequestsMs = WarMonitorFeature.intervals.minTimeBetweenRequests;
@@ -1626,10 +1946,11 @@ submit(factionId, payload) {
         window.addEventListener("twse-config-updated", onConfigUpdated);
         const onClearCache = () => {
           log$1.info("Received twse-clear-cache event. Purging all caches.");
-          memberStatus.clear();
+          members.clear();
           factionCache.clearAll();
           activeChains.clear();
           unexpectedTransitions.clear();
+          okaySinceTimestamps.clear();
           lastAppliedTimestamp.clear();
           updateStatuses();
         };
@@ -1852,135 +2173,26 @@ submit(factionId, payload) {
         }
         function extractAllMemberLis() {
           memberLis.clear();
-          const memberLists = document.querySelectorAll("ul.members-list");
-          memberLists.forEach((ul) => {
-            const lis = ul.querySelectorAll("li.enemy, li.your");
-            lis.forEach((li) => {
-              const atag = li.querySelector(
-                "a[href^='/profiles.php']"
-              );
-              if (!atag) return;
-              const parts = atag.href.split("ID=");
-              if (parts.length <= 1) return;
-              const id = parts[1];
-              memberLis.set(id, {
-                li,
-                statusDiv: li.querySelector("div.status")
-              });
-              injectCopyButton(id, li);
-            });
-          });
-        }
-        function getFactionIds() {
-          const memberLists = document.querySelectorAll("ul.members-list");
-          const ids = [];
-          memberLists.forEach((elem) => {
-            const q = elem.querySelector(
-              "a[href^='/factions.php']"
-            );
-            if (!q) return;
-            const s2 = q.href.split("ID=");
-            if (s2.length <= 1) return;
-            const id = s2[1];
-            if (id) {
-              ids.push(id);
-            }
-          });
-          return ids;
-        }
-        function getSortedColumn(memberList) {
-          const parent = memberList.parentNode;
-          if (!parent) return { column: null, order: null };
-          const memberDiv = parent.querySelector("div.member div");
-          const levelDiv = parent.querySelector("div.level div");
-          const pointsDiv = parent.querySelector("div.points div");
-          const statusDiv = parent.querySelector("div.status div");
-          let column = null;
-          let classname = "";
-          if (memberDiv?.className.includes("activeIcon__")) {
-            column = "member";
-            classname = memberDiv.className;
-          } else if (levelDiv?.className.includes("activeIcon__")) {
-            column = "level";
-            classname = levelDiv.className;
-          } else if (pointsDiv?.className.includes("activeIcon__")) {
-            column = "points";
-            classname = pointsDiv.className;
-          } else if (statusDiv?.className.includes("activeIcon__")) {
-            column = "status";
-            classname = statusDiv.className;
+          for (const row of getMemberRows()) {
+            memberLis.set(row.id, { li: row.li, statusDiv: row.statusDiv });
+            injectCopyButton(row.id, row.li);
           }
-          const order = classname.includes("asc__") ? "asc" : "desc";
-          if (column && (column !== "points" || order !== "desc")) {
-            everSorted = true;
-          }
-          return { column, order };
         }
         function populateCachedStatus(factionId) {
           const cached = factionCache.get(factionId);
           if (!cached) return;
-          for (const [id, status] of Object.entries(cached)) {
-            memberStatus.set(id, status);
+          for (const [id, member] of Object.entries(cached)) {
+            members.set(id, member);
           }
           log$1.info(
             `Populated war monitor cache with stored statuses for faction: ${factionId}`
           );
         }
-        const attrCache = new WeakMap();
-        const styleCache = new WeakMap();
-        const cacheableAttrs = new Set([
-          "data-until",
-          "data-okay-since",
-          "data-sortA",
-          "data-location",
-          "data-unexpected-at",
-          "data-twse-traveling",
-          "data-twse-highlight",
-          "data-twse-status-differs",
-          "data-twse-overridden"
-        ]);
-        function queueAttrWrite(elem, attr, value) {
-          if (cacheableAttrs.has(attr)) {
-            let cache = attrCache.get(elem);
-            if (!cache) {
-              cache = {};
-              attrCache.set(elem, cache);
-            }
-            if (cache[attr] === void 0) {
-              cache[attr] = elem.getAttribute(attr) || "";
-            }
-            if (cache[attr] !== value) {
-              cache[attr] = value;
-              deferredWrites.push([elem, attr, value]);
-              return true;
-            }
-            return false;
-          }
-          if (elem.getAttribute(attr) !== value) {
-            deferredWrites.push([elem, attr, value]);
-            return true;
-          }
-          return false;
-        }
-        function queueStyleWrite(elem, prop, value) {
-          {
-            let cache = styleCache.get(elem);
-            if (!cache) {
-              cache = {};
-              styleCache.set(elem, cache);
-            }
-            if (cache[prop] === void 0) {
-              cache[prop] = elem.style.getPropertyValue(prop);
-            }
-            if (cache[prop] !== value) {
-              cache[prop] = value;
-              deferredStyles.push([elem, prop, value]);
-            }
-            return;
-          }
-        }
         function sortMemberList(listElem) {
           let sortedColumn = getSortedColumn(listElem);
+          if (sortedColumn.column && (sortedColumn.column !== "points" || sortedColumn.order !== "desc")) {
+            everSorted = true;
+          }
           if (!everSorted) {
             sortedColumn = { column: "status", order: "asc" };
           }
@@ -2044,7 +2256,7 @@ submit(factionId, payload) {
         function setupMemberListObservers() {
           for (const obs of memberListObservers) obs.disconnect();
           memberListObservers.length = 0;
-          const memberLists = document.querySelectorAll("ul.members-list");
+          const memberLists = getMemberLists();
           for (let i2 = 0; i2 < memberLists.length; i2++) {
             const ul = memberLists[i2];
             const obs = observeElement(
@@ -2064,17 +2276,23 @@ submit(factionId, payload) {
           const earliestArrivalAttr = li.getAttribute("data-earliest-arrival");
           const latestArrivalAttr = li.getAttribute("data-latest-arrival");
           if (!earliestArrivalAttr && !latestArrivalAttr) return "";
-          const earliestArrival = parseInt(earliestArrivalAttr || "", 10);
-          const latestArrival = parseInt(latestArrivalAttr || "", 10);
+          const earliestArrival = parseInt(
+            earliestArrivalAttr || "",
+            10
+          );
+          const latestArrival = parseInt(
+            latestArrivalAttr || "",
+            10
+          );
           if (Number.isNaN(earliestArrival) && Number.isNaN(latestArrival))
             return "";
-          const now = getCurrentTimeSec();
-          if (!Number.isNaN(earliestArrival) && earliestArrival > now) {
-            const remaining = Math.round(earliestArrival - now);
+          const nowSec = getCurrentTime() / 1e3;
+          if (!Number.isNaN(earliestArrival) && earliestArrival > nowSec) {
+            const remaining = Math.round(earliestArrival - nowSec);
             return ` ${calc_delta(remaining, false, false)}`;
           }
-          if (!Number.isNaN(latestArrival) && latestArrival > now) {
-            const remaining = Math.round(latestArrival - now);
+          if (!Number.isNaN(latestArrival) && latestArrival > nowSec) {
+            const remaining = Math.round(latestArrival - nowSec);
             return ` <${calc_delta(remaining, false, false)}`;
           }
           return " LATE";
@@ -2098,15 +2316,14 @@ submit(factionId, payload) {
           }
           if (data.members) {
             const reqTime = Date.now();
-            const factionStatus = {};
+            const factionMembers = {};
             for (const memberData of data.members) {
               const id = String(memberData.id);
-              const status = memberData.status;
-              status.last_req_time = reqTime;
-              memberStatus.set(id, status);
-              factionStatus[id] = status;
+              memberData.status.last_req_time = reqTime;
+              members.set(id, memberData);
+              factionMembers[id] = memberData;
             }
-            factionCache.set(factionId, factionStatus);
+            factionCache.set(factionId, factionMembers);
           }
           if (data.chain) {
             activeChains.set(factionId, {
@@ -2114,7 +2331,7 @@ submit(factionId, payload) {
               max: data.chain.max,
               timeout: data.chain.timeout,
               modifier: data.chain.modifier,
-              apiReceivedAt: getCurrentTimeSec(),
+              apiReceivedAt: getCurrentTime(),
               cooldown: data.chain.cooldown || 0,
               end: data.chain.end
             });
@@ -2151,206 +2368,186 @@ submit(factionId, payload) {
             }
           }
         }
+        const SORT_GROUP_TO_SORT_A = {
+          [SortGroup.UnexpectedOkay]: "0",
+          [SortGroup.ExpectedOkay]: "1",
+          [SortGroup.Hospitalized]: "2",
+          [SortGroup.Incoming]: "3",
+          [SortGroup.Abroad]: "4",
+          [SortGroup.Outgoing]: "5",
+          [SortGroup.Traveling]: "6"
+        };
+        function applyClassification(li, statusDiv, status, classification, tornNow) {
+          domWriter.setAttr(
+            li,
+            "data-sortA",
+            SORT_GROUP_TO_SORT_A[classification.sortGroup]
+          );
+          const isTravelState = status.state === "Traveling" || status.state === "Abroad";
+          let dataLocation = "";
+          let overridden = false;
+          switch (classification.sortGroup) {
+            case SortGroup.Abroad: {
+              const content = shorten_destination(
+                status.description.split("In ")[1]
+              );
+              dataLocation = content;
+              domWriter.setStyle(statusDiv, "--twse-content", `"${content}"`);
+              overridden = true;
+              break;
+            }
+            case SortGroup.Outgoing: {
+              if (classification.route) {
+                dataLocation = `► ${classification.route.to}`;
+                const remaining = calculateFlightTimeRemaining(li);
+                domWriter.setStyle(
+                  statusDiv,
+                  "--twse-content",
+                  `"${dataLocation}${remaining}"`
+                );
+                overridden = true;
+              }
+              break;
+            }
+            case SortGroup.Incoming: {
+              if (classification.route) {
+                dataLocation = `◄ ${classification.route.from}`;
+                const remaining = calculateFlightTimeRemaining(li);
+                domWriter.setStyle(
+                  statusDiv,
+                  "--twse-content",
+                  `"${dataLocation}${remaining}"`
+                );
+                overridden = true;
+              }
+              break;
+            }
+            case SortGroup.Traveling: {
+              if (isTravelState) {
+                dataLocation = "Traveling";
+                domWriter.setStyle(
+                  statusDiv,
+                  "--twse-content",
+                  `"${dataLocation}"`
+                );
+                overridden = true;
+              }
+              break;
+            }
+            case SortGroup.Hospitalized: {
+              const timeRemaining = Math.round(
+                (status.until ?? 0) - tornNow / 1e3
+              );
+              if (timeRemaining > 0) {
+                const timeStr = calc_delta(timeRemaining);
+                domWriter.setStyle(statusDiv, "--twse-content", `"${timeStr}"`);
+                overridden = true;
+              }
+              break;
+            }
+          }
+          domWriter.setAttr(li, "data-location", dataLocation);
+          const okaySince = classification.nextTransitionState.okaySince;
+          domWriter.setAttr(
+            li,
+            "data-okay-since",
+            okaySince === null ? "" : String(okaySince)
+          );
+          const unexpectedAt = classification.nextTransitionState.unexpectedSince ?? 0;
+          domWriter.setAttr(li, "data-unexpected-at", String(unexpectedAt));
+          domWriter.setAttr(
+            statusDiv,
+            STATUS_DIFFERS,
+            classification.isUnexpectedHighlighted ? "true" : "false"
+          );
+          if (!isTravelState) {
+            if (classification.sortGroup === SortGroup.Hospitalized) {
+              domWriter.setAttr(
+                statusDiv,
+                TRAVELING,
+                status.description.includes("In a") ? "true" : "false"
+              );
+            } else {
+              domWriter.setAttr(statusDiv, TRAVELING, "false");
+            }
+            domWriter.setAttr(
+              statusDiv,
+              HIGHLIGHT,
+              classification.isNearExpiry ? "true" : "false"
+            );
+          }
+          domWriter.setAttr(
+            statusDiv,
+            "data-twse-overridden",
+            overridden ? "true" : "false"
+          );
+        }
         function watch() {
-          deferredWrites.length = 0;
-          deferredStyles.length = 0;
-          let dirtySort = false;
-          const okaySince = Date.now();
           memberLis.forEach((elem, id) => {
             const li = elem.li;
             const statusDiv = elem.statusDiv;
             if (!li || !statusDiv) return;
-            const status = memberStatus.get(id);
-            if (!status || !running) {
-              queueAttrWrite(statusDiv, "data-twse-overridden", "false");
+            const member = members.get(id);
+            if (!member || !running) {
+              domWriter.setAttr(statusDiv, "data-twse-overridden", "false");
               return;
             }
-            if (queueAttrWrite(li, "data-until", String(status.until ?? 0))) {
-              dirtySort = true;
-            }
-            if (queueAttrWrite(li, "data-player_id", String(id))) {
-              dirtySort = true;
-            }
-            let dataLocation = "";
-            switch (status.state) {
-              case "Abroad":
-              case "Traveling": {
-                const hasTravelingClass = statusDiv.classList.contains("traveling") || statusDiv.classList.contains("abroad");
-                if (!hasTravelingClass) {
-                  if (statusDiv.textContent === "Okay") {
-                    if (!unexpectedTransitions.has(id)) {
-                      unexpectedTransitions.set(id, Date.now());
-                    }
-                    if (queueAttrWrite(li, "data-sortA", "0")) {
-                      dirtySort = true;
-                    }
-                  }
-                  queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-                  break;
-                }
-                unexpectedTransitions.delete(id);
-                queueAttrWrite(li, "data-okay-since", "");
-                queueAttrWrite(statusDiv, "data-twse-overridden", "true");
-                if (status.description.includes("In ")) {
-                  if (queueAttrWrite(li, "data-sortA", "4")) {
-                    dirtySort = true;
-                  }
-                  const content = shorten_destination(
-                    status.description.split("In ")[1]
-                  );
-                  dataLocation = content;
-                  queueStyleWrite(statusDiv, "--twse-content", `"${content}"`);
-                  break;
-                }
-                const route = extract_destinations_from_description(
-                  status.description
-                );
-                if (route?.from === "TC") {
-                  if (queueAttrWrite(li, "data-sortA", "5")) {
-                    dirtySort = true;
-                  }
-                  const dest = route.to;
-                  dataLocation = `► ${dest}`;
-                  const remaining = calculateFlightTimeRemaining(li);
-                  queueStyleWrite(
-                    statusDiv,
-                    "--twse-content",
-                    `"${dataLocation}${remaining}"`
-                  );
-                } else if (route?.to === "TC") {
-                  if (queueAttrWrite(li, "data-sortA", "3")) {
-                    dirtySort = true;
-                  }
-                  const dest = route.from;
-                  dataLocation = `◄ ${dest}`;
-                  const remaining = calculateFlightTimeRemaining(li);
-                  queueStyleWrite(
-                    statusDiv,
-                    "--twse-content",
-                    `"${dataLocation}${remaining}"`
-                  );
-                } else {
-                  if (queueAttrWrite(li, "data-sortA", "6")) {
-                    dirtySort = true;
-                  }
-                  dataLocation = "Traveling";
-                  queueStyleWrite(
-                    statusDiv,
-                    "--twse-content",
-                    `"${dataLocation}"`
-                  );
-                }
-                break;
-              }
-              case "Hospital":
-              case "Jail": {
-                const now = getCurrentTimeSec();
-                const timeRemaining = Math.round((status.until ?? 0) - now);
-                const hasHospitalClass = statusDiv.classList.contains("hospital") || statusDiv.classList.contains("jail");
-                if (!hasHospitalClass) {
-                  if (timeRemaining >= 0) {
-                    if (!unexpectedTransitions.has(id)) {
-                      unexpectedTransitions.set(id, Date.now());
-                    }
-                    if (queueAttrWrite(li, "data-sortA", "0")) {
-                      dirtySort = true;
-                    }
-                  } else {
-                    unexpectedTransitions.delete(id);
-                    if (queueAttrWrite(
-                      li,
-                      "data-okay-since",
-                      String((status.until ?? 0) * 1e3)
-                    )) {
-                      dirtySort = true;
-                    }
-                    if (queueAttrWrite(li, "data-sortA", "1")) {
-                      dirtySort = true;
-                    }
-                  }
-                  queueAttrWrite(statusDiv, TRAVELING, "false");
-                  queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-                  queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-                  break;
-                }
-                unexpectedTransitions.delete(id);
-                queueAttrWrite(li, "data-okay-since", "");
-                if (queueAttrWrite(li, "data-sortA", "2")) {
-                  dirtySort = true;
-                }
-                if (status.description.includes("In a")) {
-                  queueAttrWrite(statusDiv, TRAVELING, "true");
-                } else {
-                  queueAttrWrite(statusDiv, TRAVELING, "false");
-                }
-                if (timeRemaining <= 0) {
-                  queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-                  queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-                  break;
-                }
-                queueAttrWrite(statusDiv, "data-twse-overridden", "true");
-                const timeStr = calc_delta(timeRemaining);
-                queueStyleWrite(statusDiv, "--twse-content", `"${timeStr}"`);
-                if (timeRemaining < 300) {
-                  queueAttrWrite(statusDiv, HIGHLIGHT, "true");
-                } else {
-                  queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-                }
-                break;
-              }
-              default: {
-                const sortAValue = unexpectedTransitions.has(id) ? "0" : "1";
-                if (queueAttrWrite(li, "data-sortA", sortAValue)) {
-                  dirtySort = true;
-                }
-                if (sortAValue === "1" && !li.getAttribute("data-okay-since")) {
-                  if (queueAttrWrite(li, "data-okay-since", String(okaySince))) {
-                    dirtySort = true;
-                  }
-                }
-                queueAttrWrite(statusDiv, TRAVELING, "false");
-                queueAttrWrite(statusDiv, HIGHLIGHT, "false");
-                queueAttrWrite(statusDiv, "data-twse-overridden", "false");
-                break;
-              }
-            }
-            if (li.getAttribute("data-location") !== dataLocation) {
-              queueAttrWrite(li, "data-location", dataLocation);
-              dirtySort = true;
-            }
-            const unexpectedAt = unexpectedTransitions.get(id) ?? 0;
-            if (queueAttrWrite(li, "data-unexpected-at", String(unexpectedAt))) {
-              dirtySort = true;
-            }
-            const isHighlighted = unexpectedAt > 0 && Date.now() - unexpectedAt < UNEXPECTED_HIGHLIGHT_MS;
-            queueAttrWrite(
-              statusDiv,
-              STATUS_DIFFERS,
-              isHighlighted ? "true" : "false"
+            const status = member.status;
+            domWriter.setAttr(li, "data-until", String(status.until ?? 0));
+            domWriter.setAttr(li, "data-player_id", String(id));
+            domWriter.setAttr(
+              li,
+              "data-twse-last-action-timestamp",
+              String(member.last_action?.timestamp ?? 0)
             );
+            const canonicalStatus = parseCanonicalStatus(statusDiv);
+            const transitionState = {
+              unexpectedSince: unexpectedTransitions.get(id) ?? null,
+              okaySince: okaySinceTimestamps.get(id) ?? null
+            };
+            const browserNow = Date.now();
+            const tornNow = getCurrentTime();
+            const classification = classifyMember(
+              status,
+              canonicalStatus,
+              transitionState,
+              browserNow,
+              tornNow,
+              {
+                unexpectedHighlightMs: UNEXPECTED_HIGHLIGHT_MS,
+                nearExpiryThresholdSec: WarMonitorFeature.intervals.nearExpiryThresholdSec
+              }
+            );
+            if (classification.nextTransitionState.unexpectedSince === null) {
+              unexpectedTransitions.delete(id);
+            } else {
+              unexpectedTransitions.set(
+                id,
+                classification.nextTransitionState.unexpectedSince
+              );
+            }
+            if (classification.nextTransitionState.okaySince === null) {
+              okaySinceTimestamps.delete(id);
+            } else {
+              okaySinceTimestamps.set(
+                id,
+                classification.nextTransitionState.okaySince
+              );
+            }
+            applyClassification(li, statusDiv, status, classification, tornNow);
           });
-          if (deferredWrites.length > 0) {
-            for (const [elem, attr, val] of deferredWrites) {
-              elem.setAttribute(attr, val);
-            }
-            deferredWrites.length = 0;
-          }
-          if (deferredStyles.length > 0) {
-            for (const [elem, prop, val] of deferredStyles) {
-              elem.style.setProperty(prop, val);
-            }
-            deferredStyles.length = 0;
-          }
-          if (twseconfig.war_sorting && dirtySort) {
+          const dirtyGroups = domWriter.flush();
+          if (twseconfig.war_sorting && (dirtyGroups.has("sort") || forceSortNextTick)) {
+            forceSortNextTick = false;
             _isSorting = true;
-            const memberLists = document.querySelectorAll("ul.members-list");
+            const memberLists = getMemberLists();
             for (let i2 = 0; i2 < memberLists.length; i2++) {
               sortMemberList(memberLists[i2]);
             }
             _isSorting = false;
           }
           if (ffscouterSortingDeferred) {
-            const memberLists = document.querySelectorAll("ul.members-list");
+            const memberLists = getMemberLists();
             let activeFilterFound = false;
             for (let i2 = 0; i2 < memberLists.length; i2++) {
               if (memberLists[i2].getAttribute("data-ffscouter-active-filter") === "true") {
@@ -2360,7 +2557,7 @@ submit(factionId, payload) {
             }
             if (!activeFilterFound) {
               ffscouterSortingDeferred = false;
-              dirtySort = true;
+              forceSortNextTick = true;
             }
           }
           for (const [id, ref] of memberLis) {
@@ -2380,13 +2577,16 @@ submit(factionId, payload) {
           const bodyContainer = bubbleContainer.querySelector(".twse-chain-body");
           if (!bodyContainer) return;
           let html = "";
-          const now = getCurrentTimeSec();
+          const nowSec = getCurrentTime() / 1e3;
           activeChains.forEach((chain) => {
             let formattedTime = "";
             let timerClass = "okay";
             let countClass = "";
             if (chain.cooldown > 0) {
-              const remainingCooldown = Math.max(0, chain.cooldown - now);
+              const remainingCooldown = Math.max(
+                0,
+                chain.cooldown - nowSec
+              );
               formattedTime = formatChainCooldown(remainingCooldown);
               timerClass = "cooldown";
               countClass = "cooldown";
@@ -2394,7 +2594,7 @@ submit(factionId, payload) {
               formattedTime = "-:--";
               timerClass = "okay";
             } else {
-              const remaining = chain.end - now;
+              const remaining = chain.end - nowSec;
               if (remaining < 0) {
                 formattedTime = formatChainTimeout(remaining);
                 timerClass = "negative";
