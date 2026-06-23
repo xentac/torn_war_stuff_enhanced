@@ -17,6 +17,7 @@ jspm_packages/
 # Output directory
 dist/
 dist-dev/
+dist-release/
 
 # IDEs and editors
 .idea/
