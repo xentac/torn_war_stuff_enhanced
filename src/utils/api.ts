@@ -24,7 +24,8 @@ export class TornApiClient {
       return null;
     }
 
-    const url = `${this.baseUrl}?id=${factionId}&selections=members,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced`;
+    // Ask for a timestamp in the future so we don't accidentally get cached data
+    const url = `${this.baseUrl}?id=${factionId}&selections=members,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced&timestamp=${(Date.now() % 1000) + 10}`;
 
     try {
       const response = await fetch(url);
