@@ -26,6 +26,11 @@ const EDITIONS = {
 
 type EditionKey = keyof typeof EDITIONS;
 
+// GreasyFork's "additional info" field is pointed at this file's raw URL on each
+// release branch, so it needs to be copied into release worktrees just like the
+// built userscript itself.
+const ADDITIONAL_INFO_PATH = "docs/greasyfork-additional-info.md";
+
 // Helper to run shell commands safely
 function runCmd(
   cmd: string,
@@ -158,6 +163,154 @@ function getReleaseMetadata(branch: string) {
   return null;
 }
 
+// Ensure a release branch exists locally, tracking origin or created as an orphan
+function ensureReleaseBranchExists(branch: string, currentBranch: string) {
+  let branchExists = false;
+  try {
+    execSync(`git show-ref --verify --quiet refs/heads/${branch}`);
+    branchExists = true;
+  } catch {
+    // Local branch doesn't exist. Check remote
+    try {
+      execSync(`git show-ref --verify --quiet refs/remotes/origin/${branch}`);
+      execSync(`git branch ${branch} origin/${branch}`);
+      branchExists = true;
+    } catch {
+      // Doesn't exist anywhere. Create as orphan.
+    }
+  }
+
+  if (!branchExists) {
+    console.log(`Creating orphan release branch: ${branch}`);
+    runCmd("git", ["checkout", "--orphan", branch]);
+    runCmd("git", ["rm", "-rf", "."]);
+    // Commit an empty file to initialize
+    execSync('git commit --allow-empty -m "Initialize release branch"');
+    runCmd("git", ["checkout", currentBranch]);
+  }
+}
+
+// Copies the additional-info doc into a worktree for `branch` and commits it if changed.
+// Returns true if a commit was made.
+function publishAdditionalInfoToBranch(
+  branch: string,
+  sourceCommit: string,
+): boolean {
+  const worktreeDir = ".release-worktree";
+  if (existsSync(worktreeDir)) {
+    rmSync(worktreeDir, { recursive: true, force: true });
+  }
+
+  console.log(
+    `Creating git worktree at ${worktreeDir} for branch ${branch}...`,
+  );
+  runCmd("git", ["worktree", "add", "-B", branch, worktreeDir, branch]);
+
+  console.log(`Copying ${ADDITIONAL_INFO_PATH} to worktree...`);
+  copyFileSync(
+    ADDITIONAL_INFO_PATH,
+    `${worktreeDir}/greasyfork-additional-info.md`,
+  );
+  runCmd("git", ["-C", worktreeDir, "add", "greasyfork-additional-info.md"]);
+
+  const hasChanges = execSync(`git -C ${worktreeDir} status --porcelain`)
+    .toString()
+    .trim();
+  let committed = false;
+  if (hasChanges) {
+    const commitMessage = `Update GreasyFork additional info\n\nSynced from commit: ${sourceCommit}`;
+    runCmd("git", ["-C", worktreeDir, "commit", "-m", commitMessage]);
+    committed = true;
+  } else {
+    console.log(`No changes to additional-info doc on ${branch}.`);
+  }
+
+  console.log("Cleaning up worktree...");
+  runCmd("git", ["worktree", "remove", "--force", worktreeDir]);
+  if (existsSync(worktreeDir)) {
+    rmSync(worktreeDir, { recursive: true, force: true });
+  }
+
+  return committed;
+}
+
+// Prints the latest tag for each edition, one line apiece
+function printAllEditionsSummary() {
+  console.log("\x1b[1mRecent tags by edition:\x1b[0m");
+  for (const key of Object.keys(EDITIONS) as EditionKey[]) {
+    const recent = getRecentTagsForEdition(key, 1);
+    const latest = recent[0] ?? "\x1b[90m(no releases yet)\x1b[0m";
+    console.log(`  \x1b[36m${key.padEnd(10)}\x1b[0m ${latest}`);
+  }
+  console.log("");
+}
+
+// Interactive flow for `--docs`: publish the additional-info doc to one or both
+// release branches without building/tagging a release.
+async function runDocsPublish(
+  rl: readline.Interface,
+  currentBranch: string,
+  sourceCommit: string,
+): Promise<void> {
+  if (!existsSync(ADDITIONAL_INFO_PATH)) {
+    console.error(`\x1b[31mError: ${ADDITIONAL_INFO_PATH} not found.\x1b[0m`);
+    process.exit(1);
+  }
+
+  console.log("Select edition(s) to publish the additional-info doc to:");
+  console.log(`  [1] standard (${EDITIONS.standard.name})`);
+  console.log(`  [2] beta (${EDITIONS.beta.name})`);
+  console.log("  [3] both");
+
+  const choice = await rl.question("Choice (1-3): ");
+  let selectedKeys: EditionKey[];
+  switch (choice.trim()) {
+    case "1":
+      selectedKeys = ["standard"];
+      break;
+    case "2":
+      selectedKeys = ["beta"];
+      break;
+    case "3":
+      selectedKeys = ["standard", "beta"];
+      break;
+    default:
+      console.error("Invalid choice.");
+      process.exit(1);
+  }
+
+  console.log("\n------------------------------------------------");
+  console.log("Publishing additional-info doc to:");
+  for (const key of selectedKeys) {
+    console.log(`  - ${EDITIONS[key].name} (${EDITIONS[key].branch})`);
+  }
+  console.log("------------------------------------------------\n");
+
+  const proceed = await rl.question("Proceed? (y/N): ");
+  if (proceed.toLowerCase() !== "y") {
+    console.log("Cancelled.");
+    return;
+  }
+
+  const updatedBranches: string[] = [];
+  for (const key of selectedKeys) {
+    const branch = EDITIONS[key].branch;
+    ensureReleaseBranchExists(branch, currentBranch);
+    if (publishAdditionalInfoToBranch(branch, sourceCommit)) {
+      updatedBranches.push(branch);
+    }
+  }
+
+  if (updatedBranches.length > 0) {
+    console.log("\n\x1b[32mDone. To publish, run:\x1b[0m");
+    console.log(
+      `  \x1b[36mgit push origin ${updatedBranches.join(" ")}\x1b[0m\n`,
+    );
+  } else {
+    console.log("\nNo branches had changes to publish.");
+  }
+}
+
 // Helper to show status of an edition compared to HEAD
 async function showEditionStatus(editionKey: EditionKey, sourceCommit: string) {
   const edition = EDITIONS[editionKey];
@@ -257,6 +410,7 @@ async function main() {
     const isDiff = args.some((arg) =>
       ["--diff", "diff", "-d", "status", "--status"].includes(arg),
     );
+    const isDocsMode = args.some((arg) => ["--docs", "docs"].includes(arg));
 
     // 1. Ensure working directory is clean (skipped in diff/status mode)
     if (!isDiff) {
@@ -276,8 +430,19 @@ async function main() {
       "DETACHED_HEAD";
     const sourceCommit = execSync("git rev-parse HEAD").toString().trim();
 
+    printAllEditionsSummary();
+
     const cleanArgs = args.filter(
-      (arg) => !["--diff", "diff", "-d", "status", "--status"].includes(arg),
+      (arg) =>
+        ![
+          "--diff",
+          "diff",
+          "-d",
+          "status",
+          "--status",
+          "--docs",
+          "docs",
+        ].includes(arg),
     );
 
     const keys = Object.keys(EDITIONS) as EditionKey[];
@@ -319,6 +484,12 @@ async function main() {
       }
 
       await showEditionStatus(editionKey, sourceCommit);
+      process.exit(0);
+    }
+
+    // Handle docs-only publish mode (escape hatch: no build, no version, no tag)
+    if (isDocsMode) {
+      await runDocsPublish(rl, currentBranch, sourceCommit);
       process.exit(0);
     }
 
@@ -401,31 +572,7 @@ async function main() {
     }
 
     // 6. Ensure Release Branch Exists
-    let branchExists = false;
-    try {
-      execSync(`git show-ref --verify --quiet refs/heads/${edition.branch}`);
-      branchExists = true;
-    } catch {
-      // Local branch doesn't exist. Check remote
-      try {
-        execSync(
-          `git show-ref --verify --quiet refs/remotes/origin/${edition.branch}`,
-        );
-        execSync(`git branch ${edition.branch} origin/${edition.branch}`);
-        branchExists = true;
-      } catch {
-        // Doesn't exist anywhere. Create as orphan.
-      }
-    }
-
-    if (!branchExists) {
-      console.log(`Creating orphan release branch: ${edition.branch}`);
-      runCmd("git", ["checkout", "--orphan", edition.branch]);
-      runCmd("git", ["rm", "-rf", "."]);
-      // Commit an empty file to initialize
-      execSync('git commit --allow-empty -m "Initialize release branch"');
-      runCmd("git", ["checkout", currentBranch]);
-    }
+    ensureReleaseBranchExists(edition.branch, currentBranch);
 
     // 7. Run the Build
     console.log(`Building ${edition.name} v${version}...`);
@@ -479,10 +626,9 @@ async function main() {
     copyFileSync(builtFilePath, `${worktreeDir}/${edition.fileName}`);
 
     // Copy Greasy Fork additional info doc, since GF reads it directly from this branch
-    const additionalInfoPath = "docs/greasyfork-additional-info.md";
-    console.log(`Copying ${additionalInfoPath} to worktree...`);
+    console.log(`Copying ${ADDITIONAL_INFO_PATH} to worktree...`);
     copyFileSync(
-      additionalInfoPath,
+      ADDITIONAL_INFO_PATH,
       `${worktreeDir}/greasyfork-additional-info.md`,
     );
 
