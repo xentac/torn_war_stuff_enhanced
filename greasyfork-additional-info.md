@@ -1,30 +1,40 @@
-Torn War Stuff Enhanced augments the Torn City faction war page with real-time member status, sorted views, and chain tracking. It runs entirely inside the war page DOM and layers on top of what Torn already shows you.
+Torn War Stuff Enhanced augments the Torn City faction war box with near-real-time member status, sorted priority of members, and chain tracking. It runs entirely inside the war page DOM and layers on top of what Torn already shows you.
+
+This version is a nearly entirely rewritten version with many new features along with numerous quality of life improvements!
 
 ## Features
 
 - Real-time hospital countdown timers and travel destinations overlaid on each member's row
-- Members who land or med/revive early are sorted to the top of the Okay section and highlighted
-- Chain tracking of both factions
-- Optional community data sharing (via the TWSE Server) that fills in the gaps between your own poll interval with fresher data contributed by other script users tracking the same faction
+- Sorts faction members by Okay/Hospital/Departing/Abroad/Returning
+- Members who land or med/revive early are sorted to the top of the Okay section and highlighted (if window focused)
+- Chain count and timers always on screen
+- Quick copy `Name [ID]` of a player by clicking on the right side of their honor bar
+- Optional Torn API status sharing (via the TWSE Server) to ensure up-to-date timers
+- Tuned for efficiency! Most features and lowest performance impact of any war monitoring script.
 
-- Integration with FF Scouter
+- If you install both [FF Scouter](https://greasyfork.org/en/scripts/535292-ff-scouter-v2) and [Torn War Stuff Enhanced](https://greasyfork.org/en/scripts/529238-torn-war-stuff-enhanced) to enable additional features
   - Premium users can see flight estimates
+  - Filtering by last action
+  - Sorting by FF/Est
 
 ## Setup
 
-The script needs your Torn API key to poll faction data. Register it via the Tampermonkey menu command **"Torn War Stuff: Register Key"** (click the Tampermonkey icon → this script → the menu command). A **Public** access key is all that's required -- no elevated permissions needed.
+The script needs a Public API key to poll faction data. Register it via the Tampermonkey menu command **"Torn War Stuff: Register Key"** (click the Tampermonkey icon → this script → the menu command) or in the settings box on the faction page.
+
+Configuration is handled by the "Torn War Stuff Enhanced Settings" box at the bottom of the faction page.
 
 ## Privacy & Torn API Terms of Service
 
 Per the [Torn API Terms of Service](https://www.torn.com/api.html#), here's what this script stores, shares, and why:
 
-|                           |                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Data Storage**          | Persistent, locally on your device — the API key is stored in browser `localStorage`. The script itself doesn't persist faction data; it forwards each poll to the TWSE Server (see below), which persists snapshots server-side.                                                                                                           |
-| **Data Sharing**          | The API key is never shared with anyone but `api.torn.com`. Faction member/chain/timestamp data, plus a one-way SHA-256 hash of your key, is sent to the TWSE Server (`twse.dev`) — a community aggregation service this script integrates with. Anyone who knows your faction ID can query that aggregated data back from the TWSE Server. |
-| **Purpose of Use**        | Community tool / statistical aggregation — the TWSE Server lets script users get a fresher snapshot of faction status between their own 10-second polls, sourced from other users' polls of the same faction.                                                                                                                               |
-| **Key Storage & Sharing** | Unencrypted, local to your device only. Never transmitted to or stored by the TWSE Server — it receives a one-way SHA-256 hash, used only to avoid echoing your own submissions back to you.                                                                                                                                                |
-| **Key Access Level**      | Public                                                                                                                                                                                                                                                                                                                                      |
+- **Data Storage**: Persistent, locally on your device — the API key is stored in browser `localStorage`. The script itself doesn't persist faction data; it forwards each poll to the TWSE Server (see below), which persists snapshots server-side.
+- **Data Sharing**: The API key is never shared with anyone but `api.torn.com`. Faction member/chain/timestamp data, plus a one-way SHA-256 hash of your key, is sent to the TWSE Server (`twse.dev`) — a community aggregation service this script integrates with. Anyone who knows your faction ID can query that aggregated data back from the TWSE Server.
+- **Purpose of Use**: Community tool / statistical aggregation — the TWSE Server lets script users get a fresher snapshot of faction status between their own 10-second polls, sourced from other users' polls of the same faction.
+- **Key Storage & Sharing**: Unencrypted, local to your device only. Never transmitted to or stored by the TWSE Server — it receives a one-way SHA-256 hash, used only to avoid echoing your own submissions back to you.
+- **Key Access Level**: Public
+
+> [!note]
+> To comply with Torn scraping rules, med/revive/flight arrival will only highlight the row when the window is in focus.
 
 ## Editions
 
@@ -34,6 +44,8 @@ Per the [Torn API Terms of Service](https://www.torn.com/api.html#), here's what
 ## Support
 
 Found a bug or have a feature request? [Open an issue on GitHub](https://github.com/xentac/torn_war_stuff_enhanced/issues).
+
+Support is also available in the [FF Scouter discord server](https://discord.gg/cndwEmVSd).
 
 ## Disclaimer
 
