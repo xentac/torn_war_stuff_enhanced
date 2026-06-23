@@ -10,12 +10,13 @@ This version is a nearly entirely rewritten version with many new features along
 - Chain count and timers always on screen
 - Quick copy `Name [ID]` of a player by clicking on the right side of their honor bar
 - Optional Torn API status sharing (via the TWSE Server) to ensure up-to-date timers
-- Tuned for efficiency! Most features and lowest performance impact of any war monitoring script.
+- Tuned for efficiency: the most features and lowest performance impact of any war monitoring script!
 
-- If you install both [FF Scouter](https://greasyfork.org/en/scripts/535292-ff-scouter-v2) and [Torn War Stuff Enhanced](https://greasyfork.org/en/scripts/529238-torn-war-stuff-enhanced) to enable additional features
-  - Premium users can see flight estimates
-  - Filtering by last action
-  - Sorting by FF/Est
+If you install both [FF Scouter](https://greasyfork.org/en/scripts/535292-ff-scouter-v2) and [Torn War Stuff Enhanced](https://greasyfork.org/en/scripts/529238-torn-war-stuff-enhanced) to enable additional features:
+
+- Premium users can see flight estimates
+- Filtering by last action
+- Sorting by FF/Est
 
 ## Setup
 
@@ -33,8 +34,7 @@ Per the [Torn API Terms of Service](https://www.torn.com/api.html#), here's what
 - **Key Storage & Sharing**: Unencrypted, local to your device only. Never transmitted to or stored by the TWSE Server — it receives a one-way SHA-256 hash, used only to avoid echoing your own submissions back to you.
 - **Key Access Level**: Public
 
-> [!note]
-> To comply with Torn scraping rules, med/revive/flight arrival will only highlight the row when the window is in focus.
+> NOTE: To comply with Torn scraping rules, med/revive/flight arrival will only highlight the row when the window is in focus.
 
 ## Editions
 
