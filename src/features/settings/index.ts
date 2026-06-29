@@ -80,9 +80,30 @@ const SettingsFeature: Feature = {
       window.dispatchEvent(new CustomEvent("twse-clear-cache"));
     });
 
-    // 8. Append panel inside #factions container (at the bottom)
-    factionsContainer.appendChild(panel);
-    log.debug("Settings panel successfully appended to #factions container");
+    // 8. Handle dynamic mounting based on presence of #faction_war_list_id
+    const checkAndMount = () => {
+      const warList = document.getElementById("faction_war_list_id");
+      if (warList) {
+        if (panel.previousSibling !== warList) {
+          warList.after(panel);
+          log.debug(
+            "Settings panel successfully placed after #faction_war_list_id",
+          );
+        }
+      } else {
+        panel.remove();
+      }
+    };
+
+    // Set up MutationObserver to detect tab changes/DOM swaps inside #factions
+    const observer = new MutationObserver(checkAndMount);
+    observer.observe(factionsContainer, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Initial check
+    checkAndMount();
   },
 };
 
