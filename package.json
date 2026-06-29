@@ -11,7 +11,8 @@
     "serve:dist": "serve dist -l 5175 --cors",
     "dev:tm": "concurrently -k -r \"bun:build:dev:watch\" \"bun:serve:dist\"",
     "biome": "biome check --write",
-    "lint": "biome check && tsc --noEmit",
+    "lint": "biome check && tsc --noEmit && CI=true react-doctor --no-score --blocking error",
+    "react-doctor": "react-doctor --no-score --verbose",
     "test": "bun --bun vitest run",
     "release": "bun run scripts/release.ts"
   },
@@ -29,6 +30,7 @@
     "concurrently": "^9.2.1",
     "jsdom": "^29.1.1",
     "react": "^19.2.7",
+    "react-doctor": "^0.5.8",
     "react-dom": "^19.2.7",
     "serve": "^14.2.6",
     "typescript": "^5.9.3",
