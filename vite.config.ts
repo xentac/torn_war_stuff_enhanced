@@ -82,15 +82,50 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     resolve: {
-      alias: {
-        "@utils": path.resolve(__dirname, "src/utils"),
-        "@features": path.resolve(__dirname, "src/features"),
-        "@ui": path.resolve(__dirname, "src/ui"),
-      },
+      alias: [
+        { find: "@utils", replacement: path.resolve(__dirname, "src/utils") },
+        { find: "@features", replacement: path.resolve(__dirname, "src/features") },
+        { find: "@ui", replacement: path.resolve(__dirname, "src/ui") },
+        {
+          find: /^react$/,
+          replacement: path.resolve(__dirname, "src/shims/react.ts"),
+        },
+        {
+          find: /^react-dom\/client$/,
+          replacement: path.resolve(__dirname, "src/shims/react-dom.ts"),
+        },
+        {
+          find: /^react\/jsx-runtime$/,
+          replacement: path.resolve(__dirname, "src/shims/jsx-runtime.ts"),
+        },
+        {
+          find: /^react\/jsx-dev-runtime$/,
+          replacement: path.resolve(__dirname, "src/shims/jsx-runtime.ts"),
+        },
+        {
+          find: "@real-react",
+          replacement: path.resolve(__dirname, "node_modules/react/index.js"),
+        },
+        {
+          find: "@real-react-dom",
+          replacement: path.resolve(__dirname, "node_modules/react-dom/index.js"),
+        },
+        {
+          find: "@real-react-dom-client",
+          replacement: path.resolve(
+            __dirname,
+            "node_modules/react-dom/client.js",
+          ),
+        },
+      ],
     },
     build: {
       minify: false,
       sourcemap: isDev ? "inline" : false,
+    },
+    test: {
+      environment: "node",
+      setupFiles: ["src/tests/setup.ts"],
     },
   };
 });
