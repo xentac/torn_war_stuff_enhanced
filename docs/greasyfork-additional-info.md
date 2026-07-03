@@ -24,6 +24,20 @@ The script needs a Public API key to poll faction data. Register it via the Tamp
 
 Configuration is handled by the "Torn War Stuff Enhanced Settings" box at the bottom of the faction page.
 
+## Screenshots
+
+![Screenshot showing hospital timers with chain bubble](https://raw.githubusercontent.com/xentac/torn_war_stuff_enhanced/refs/heads/main/docs/screenshots/Hospital%20timers%20with%20chain%20bubble.png)<br>
+_Hospital timers (including < 5 minute green highlight) with chain bubble_
+
+![Screenshot showing orange med out highlight](https://raw.githubusercontent.com/xentac/torn_war_stuff_enhanced/refs/heads/main/docs/screenshots/Med%20out%20hightlights.png)<br>
+_Orange med out/landed highlight_
+
+![Screenshot showing settings panel](https://raw.githubusercontent.com/xentac/torn_war_stuff_enhanced/refs/heads/main/docs/screenshots/Settings.png)<br>
+_Settings panel_
+
+![Screenshot showing FF Scouter Premium flight estimates](https://raw.githubusercontent.com/xentac/torn_war_stuff_enhanced/refs/heads/main/docs/screenshots/FF%20Scouter%20Premiu%20flight%20estimates.png)<br>
+_FF Scouter Premium flight estimates_
+
 ## Privacy & Torn API Terms of Service
 
 Per the [Torn API Terms of Service](https://www.torn.com/api.html#), here's what this script stores, shares, and why:
