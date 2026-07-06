@@ -424,7 +424,9 @@ export class TWSESettingsPanel extends HTMLElement {
   }
 }
 
-customElements.define("twse-settings-panel", TWSESettingsPanel);
+if (!customElements.get("twse-settings-panel")) {
+  customElements.define("twse-settings-panel", TWSESettingsPanel);
+}
 
 declare global {
   interface HTMLElementTagNameMap {
