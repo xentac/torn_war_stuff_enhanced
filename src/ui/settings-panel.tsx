@@ -7,6 +7,7 @@ const DEFAULT_VALUES = {
   bubbleEnabled: true,
   copyButtonEnabled: true,
   debugLogs: false,
+  debugForceReactFallback: false,
 };
 
 type SettingsPanelComponentProps = {
@@ -19,6 +20,7 @@ type SettingsPanelComponentProps = {
   onBubbleEnabledDraftChange: (val: boolean) => void;
   onCopyButtonEnabledDraftChange: (val: boolean) => void;
   onDebugLogsDraftChange: (val: boolean) => void;
+  onDebugForceReactFallbackDraftChange: (val: boolean) => void;
   onSave: () => void;
   onReset: () => void;
   onClearCache: () => void;
@@ -35,6 +37,7 @@ export function SettingsPanelComponent({
   onBubbleEnabledDraftChange,
   onCopyButtonEnabledDraftChange,
   onDebugLogsDraftChange,
+  onDebugForceReactFallbackDraftChange,
   onSave,
   onReset,
   onClearCache,
@@ -143,6 +146,24 @@ export function SettingsPanelComponent({
           </label>
         </div>
 
+        {/* Force React fallback toggle */}
+        <div className="input-row-inline">
+          <input
+            id="twse-debug-force-react-fallback"
+            type="checkbox"
+            checked={drafts.debugForceReactFallback}
+            onChange={(e) =>
+              onDebugForceReactFallbackDraftChange(
+                (e.target as HTMLInputElement).checked,
+              )
+            }
+          />
+          <label htmlFor="twse-debug-force-react-fallback">
+            Force React fallback (@require'd copy instead of
+            unsafeWindow.React/ReactDOM)
+          </label>
+        </div>
+
         {/* Action Buttons */}
         <div
           style={{
@@ -222,6 +243,7 @@ export class TWSESettingsPanel extends HTMLElement {
       bubbleEnabled: this._props.bubbleEnabled,
       copyButtonEnabled: this._props.copyButtonEnabled,
       debugLogs: this._props.debugLogs,
+      debugForceReactFallback: this._props.debugForceReactFallback,
     };
   }
 
@@ -271,6 +293,11 @@ export class TWSESettingsPanel extends HTMLElement {
         },
         onDebugLogsDraftChange: (val) => {
           this._drafts.debugLogs = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onDebugForceReactFallbackDraftChange: (val) => {
+          this._drafts.debugForceReactFallback = val;
           this._showSavedMessage = false;
           this.render();
         },
@@ -329,6 +356,7 @@ export class TWSESettingsPanel extends HTMLElement {
           bubbleEnabled: this._drafts.bubbleEnabled,
           copyButtonEnabled: this._drafts.copyButtonEnabled,
           debugLogs: this._drafts.debugLogs,
+          debugForceReactFallback: this._drafts.debugForceReactFallback,
         },
         bubbles: true,
         composed: true,
@@ -382,6 +410,15 @@ export class TWSESettingsPanel extends HTMLElement {
     this.render();
   }
 
+  get debugForceReactFallback() {
+    return this._props.debugForceReactFallback;
+  }
+  set debugForceReactFallback(val: boolean) {
+    this._props.debugForceReactFallback = val;
+    this._drafts.debugForceReactFallback = val;
+    this.render();
+  }
+
   // Getters/Setters for draft fields (used in testing and debugging)
   get draftApiKey() {
     return this._drafts.apiKey;
@@ -420,6 +457,14 @@ export class TWSESettingsPanel extends HTMLElement {
   }
   set draftDebugLogs(val: boolean) {
     this._drafts.debugLogs = val;
+    this.render();
+  }
+
+  get draftDebugForceReactFallback() {
+    return this._drafts.debugForceReactFallback;
+  }
+  set draftDebugForceReactFallback(val: boolean) {
+    this._drafts.debugForceReactFallback = val;
     this.render();
   }
 }

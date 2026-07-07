@@ -33,6 +33,7 @@ const SettingsFeature: Feature = {
     panel.bubbleEnabled = twseconfig.bubble_enabled;
     panel.copyButtonEnabled = twseconfig.copy_button_enabled;
     panel.debugLogs = twseconfig.debug_logs;
+    panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 
     // 4. Set up event listener for Save
     panel.addEventListener("twse-save", (e: Event) => {
@@ -42,6 +43,7 @@ const SettingsFeature: Feature = {
       twseconfig.bubble_enabled = detail.bubbleEnabled;
       twseconfig.copy_button_enabled = detail.copyButtonEnabled;
       twseconfig.debug_logs = detail.debugLogs;
+      twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
 
       log.info("Settings saved successfully");
 
@@ -59,6 +61,7 @@ const SettingsFeature: Feature = {
       panel.bubbleEnabled = twseconfig.bubble_enabled;
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
       panel.debugLogs = twseconfig.debug_logs;
+      panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 
       log.info("Settings reset to defaults");
 

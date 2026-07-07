@@ -78,6 +78,22 @@ export default defineConfig(({ mode }) => {
           grant: ["GM_addStyle", "GM_registerMenuCommand", "GM_xmlhttpRequest"],
           connect: ["api.torn.com", "twse.dev"],
           "run-at": "document-end",
+          // Fallback React copy for when unsafeWindow doesn't bridge to
+          // Torn's own React/ReactDOM (see docs/adr/0008 and
+          // src/shims/react-loader.ts). This is Torn's own react-dom build,
+          // so it stays in lockstep with whatever React version the page
+          // itself runs. It has no version number in the URL we control --
+          // the hash is Torn's own build artifact name and changes on their
+          // deploys, so this needs manual bumping (check a Torn page's
+          // <script src> tags matching /builds/react-umd/react-dom.*.production.js)
+          // when the fallback path stops working.
+          //
+          // TODO before shipping: this URL was confirmed on Torn profile
+          // pages (via FFScouter); it has NOT yet been confirmed to also be
+          // present on factions.php, which is the only page TWSE runs on.
+          require: [
+            "https://www.torn.com/builds/react-umd/react-dom.19.2.0.93c06d8e.production.js",
+          ],
         },
       }),
     ],

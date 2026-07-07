@@ -4,6 +4,7 @@ import { Storage } from "./storage";
 enum CONFIG_KEYS {
   API_KEY = "apikey",
   DEBUG_LOGS = "debug_logs",
+  DEBUG_FORCE_REACT_FALLBACK = "debug_force_react_fallback",
   WAR_SORTING = "war_sorting",
   BUBBLE_POSITION = "bubble_position",
   BUBBLE_MINIMIZED = "bubble_minimized",
@@ -60,6 +61,24 @@ export class Config {
   set debug_logs(val: boolean) {
     this.storage.set(CONFIG_KEYS.DEBUG_LOGS, val);
     logger.setLevel(val ? LogLevel.DEBUG : LogLevel.INFO);
+  }
+
+  /**
+   * Forces src/shims/react-loader.ts to use the @require'd fallback copy of
+   * React even when unsafeWindow.React/.ReactDOM already work, so the
+   * fallback path can be exercised on Chrome/Firefox ahead of a
+   * Safari-specific release. No-op on Torn PDA: unsafeWindow === globalThis
+   * there, so the "fallback" reads the exact same React the normal path
+   * would. See docs/adr/0008.
+   */
+  get debug_force_react_fallback(): boolean {
+    return (
+      this.storage.get<boolean>(CONFIG_KEYS.DEBUG_FORCE_REACT_FALLBACK) ?? false
+    );
+  }
+
+  set debug_force_react_fallback(val: boolean) {
+    this.storage.set(CONFIG_KEYS.DEBUG_FORCE_REACT_FALLBACK, val);
   }
 
   /**
@@ -130,6 +149,7 @@ export class Config {
    */
   public reset(): void {
     this.storage.remove(CONFIG_KEYS.DEBUG_LOGS);
+    this.storage.remove(CONFIG_KEYS.DEBUG_FORCE_REACT_FALLBACK);
     this.storage.remove(CONFIG_KEYS.WAR_SORTING);
     this.storage.remove(CONFIG_KEYS.BUBBLE_POSITION);
     this.storage.remove(CONFIG_KEYS.BUBBLE_MINIMIZED);

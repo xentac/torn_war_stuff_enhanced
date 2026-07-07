@@ -53,3 +53,11 @@ _Avoid_: Collection service, community cache, cache service, API proxy
 **Published field**: A `data-twse-*` attribute written onto a member row specifically for another script to read, rather than for this script's own sort/render logic. `data-twse-last-action-timestamp` (the Torn API's `last_action.timestamp`, a `TornTimestampSec`, written as a string on the row's `<li>`, `"0"` if absent) is the first example — FF Scouter reads it to filter rows. Unlike the other `data-twse-*` attributes, it has no effect on this script's own sorting or highlighting.
 _Avoid_: Interop attribute, export field
 _Avoid_: API timestamp, request timestamp, response time, client timestamp
+
+### UI framework
+
+**Page React**: `react`/`react-dom/client` are never bundled into the shipped `.user.js`. The build aliases them (`vite.config.ts`) to shims (`src/shims/react.ts`, `src/shims/react-dom.ts`, via the shared `src/shims/react-loader.ts`) that prefer `unsafeWindow.React`/`.ReactDOM` at call time, borrowing the copy Torn's own page already loads, saving ~500KB+ of shipped code. Depends on the userscript manager's cross-realm object bridging actually working; unreliable on at least one Safari/Tampermonkey configuration, where it falls back instead to the same-realm copy set up by `@require`ing Torn's own react-dom UMD build (`vite.config.ts`) — see ADR-0008.
+_Avoid_: bundled React, native React
+
+**Settings Panel**: The `twse-settings-panel` custom element (`src/ui/settings-panel.tsx`) injected after `#faction_war_list_id` on the faction war page — a plain `HTMLElement` subclass that mounts a React tree into itself via Page React.
+_Avoid_: settings dialog, config panel
