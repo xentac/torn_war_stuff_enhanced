@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.0-beta25
+// @version      2.1-beta1
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
 // @match        https://www.torn.com/factions.php*
+// @require      https://www.torn.com/builds/react-umd/react-dom.19.2.0.93c06d8e.production.js
 // @connect      api.torn.com
 // @connect      twse.dev
 // @grant        GM_addStyle
@@ -253,6 +254,14 @@ get debug_logs() {
       this.storage.set("debug_logs", val);
       logger.setLevel(val ? LogLevel.DEBUG : LogLevel.INFO);
     }
+get debug_force_react_fallback() {
+      return this.storage.get(
+        "debug_force_react_fallback"
+) ?? false;
+    }
+    set debug_force_react_fallback(val) {
+      this.storage.set("debug_force_react_fallback", val);
+    }
 get war_sorting() {
       return this.storage.get(
         "war_sorting"
@@ -302,6 +311,9 @@ get copy_button_enabled() {
 reset() {
       this.storage.remove(
         "debug_logs"
+);
+      this.storage.remove(
+        "debug_force_react_fallback"
 );
       this.storage.remove(
         "war_sorting"
@@ -436,25 +448,40 @@ reset() {
     const right = parseInt(b.getAttribute(attr) || `${d}`, 10);
     return left - right;
   }
-  let _react$1;
-  function getReact$1() {
-    return _react$1 ??= unsafeWindow.React;
+  function unsafeWindowReact() {
+    return unsafeWindow;
+  }
+  function requiredReact() {
+    return globalThis;
+  }
+  function hasWorkingUnsafeWindowReact() {
+    const w = unsafeWindowReact();
+    return Boolean(w.React && w.ReactDOM);
+  }
+  function getReact() {
+    if (!twseconfig.debug_force_react_fallback && hasWorkingUnsafeWindowReact()) {
+      return unsafeWindowReact().React;
+    }
+    return requiredReact().React;
+  }
+  function getReactDOM() {
+    if (!twseconfig.debug_force_react_fallback && hasWorkingUnsafeWindowReact()) {
+      return unsafeWindowReact().ReactDOM;
+    }
+    return requiredReact().ReactDOM;
   }
   const FRAGMENT_SENTINEL = Symbol("ReactFragment");
   function jsx(type, { children, ...props }, key) {
-    const R = getReact$1();
+    const R = getReact();
+    const createElement2 = R.createElement;
     const realType = type === FRAGMENT_SENTINEL ? R.Fragment : type;
     if (key !== void 0) props.key = key;
     if (children === void 0) {
-      return R.createElement(realType, props);
+      return createElement2(realType, props);
     }
-    return Array.isArray(children) ? R.createElement(realType, props, ...children) : R.createElement(realType, props, children);
+    return Array.isArray(children) ? createElement2(realType, props, ...children) : createElement2(realType, props, children);
   }
   const jsxs = jsx;
-  let _react;
-  function getReact() {
-    return _react ??= unsafeWindow.React;
-  }
   new Proxy({}, {
     get(_, prop) {
       return getReact()[prop];
@@ -490,10 +517,6 @@ reset() {
       get: (_, prop) => getReact().Children[prop]
     }
   );
-  let _reactDOM;
-  function getReactDOM() {
-    return _reactDOM ??= unsafeWindow.ReactDOM;
-  }
   new Proxy({}, {
     get(_, prop) {
       return getReactDOM()[prop];
@@ -505,7 +528,8 @@ reset() {
     warSorting: true,
     bubbleEnabled: true,
     copyButtonEnabled: true,
-    debugLogs: false
+    debugLogs: false,
+    debugForceReactFallback: false
   };
   function SettingsPanelComponent({
     apiKey,
@@ -517,6 +541,7 @@ reset() {
     onBubbleEnabledDraftChange,
     onCopyButtonEnabledDraftChange,
     onDebugLogsDraftChange,
+    onDebugForceReactFallbackDraftChange,
     onSave,
     onReset,
     onClearCache,
@@ -605,6 +630,20 @@ jsx(
           ),
 jsx("label", { htmlFor: "twse-debug-logs", children: "Enable Developer/Debug Logging" })
         ] }),
+jsxs("div", { className: "input-row-inline", children: [
+jsx(
+            "input",
+            {
+              id: "twse-debug-force-react-fallback",
+              type: "checkbox",
+              checked: drafts.debugForceReactFallback,
+              onChange: (e) => onDebugForceReactFallbackDraftChange(
+                e.target.checked
+              )
+            }
+          ),
+jsx("label", { htmlFor: "twse-debug-force-react-fallback", children: "Force React fallback (@require'd copy instead of unsafeWindow.React/ReactDOM)" })
+        ] }),
 jsxs(
           "div",
           {
@@ -681,7 +720,8 @@ jsx(
         warSorting: this._props.warSorting,
         bubbleEnabled: this._props.bubbleEnabled,
         copyButtonEnabled: this._props.copyButtonEnabled,
-        debugLogs: this._props.debugLogs
+        debugLogs: this._props.debugLogs,
+        debugForceReactFallback: this._props.debugForceReactFallback
       };
     }
     render() {
@@ -728,6 +768,11 @@ jsx(
           },
           onDebugLogsDraftChange: (val) => {
             this._drafts.debugLogs = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onDebugForceReactFallbackDraftChange: (val) => {
+            this._drafts.debugForceReactFallback = val;
             this._showSavedMessage = false;
             this.render();
           },
@@ -779,7 +824,8 @@ jsx(
             warSorting: this._drafts.warSorting,
             bubbleEnabled: this._drafts.bubbleEnabled,
             copyButtonEnabled: this._drafts.copyButtonEnabled,
-            debugLogs: this._drafts.debugLogs
+            debugLogs: this._drafts.debugLogs,
+            debugForceReactFallback: this._drafts.debugForceReactFallback
           },
           bubbles: true,
           composed: true
@@ -826,6 +872,14 @@ get apiKey() {
       this._drafts.debugLogs = val;
       this.render();
     }
+    get debugForceReactFallback() {
+      return this._props.debugForceReactFallback;
+    }
+    set debugForceReactFallback(val) {
+      this._props.debugForceReactFallback = val;
+      this._drafts.debugForceReactFallback = val;
+      this.render();
+    }
 get draftApiKey() {
       return this._drafts.apiKey;
     }
@@ -861,8 +915,17 @@ get draftApiKey() {
       this._drafts.debugLogs = val;
       this.render();
     }
+    get draftDebugForceReactFallback() {
+      return this._drafts.debugForceReactFallback;
+    }
+    set draftDebugForceReactFallback(val) {
+      this._drafts.debugForceReactFallback = val;
+      this.render();
+    }
   }
-  customElements.define("twse-settings-panel", TWSESettingsPanel);
+  if (!customElements.get("twse-settings-panel")) {
+    customElements.define("twse-settings-panel", TWSESettingsPanel);
+  }
   const log$5 = logger.child("feature:settings");
   const SettingsFeature = {
     name: "Settings",
@@ -883,6 +946,7 @@ get draftApiKey() {
       panel.bubbleEnabled = twseconfig.bubble_enabled;
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
       panel.debugLogs = twseconfig.debug_logs;
+      panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
       panel.addEventListener("twse-save", (e) => {
         const detail = e.detail;
         twseconfig.apiKey = detail.apiKey;
@@ -890,6 +954,7 @@ get draftApiKey() {
         twseconfig.bubble_enabled = detail.bubbleEnabled;
         twseconfig.copy_button_enabled = detail.copyButtonEnabled;
         twseconfig.debug_logs = detail.debugLogs;
+        twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
         log$5.info("Settings saved successfully");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
@@ -900,6 +965,7 @@ get draftApiKey() {
         panel.bubbleEnabled = twseconfig.bubble_enabled;
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
         panel.debugLogs = twseconfig.debug_logs;
+        panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
         log$5.info("Settings reset to defaults");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
