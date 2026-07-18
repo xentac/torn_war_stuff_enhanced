@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.1-beta1
+// @version      2.1-beta2
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -1396,7 +1396,8 @@ submit(factionId, payload) {
         transitionState,
         browserNow,
         tornNow,
-        config.nearExpiryThresholdSec
+        config.nearExpiryThresholdSec,
+        config.expectedExpiryToleranceSec
       );
     } else if (status.state === "Traveling" || status.state === "Abroad") {
       decision = classifyTraveling(
@@ -1430,7 +1431,7 @@ submit(factionId, payload) {
       isNearExpiry: false
     };
   }
-  function classifyHospitalOrJail(status, canonicalStatus, transitionState, browserNow, tornNow, nearExpiryThresholdSec) {
+  function classifyHospitalOrJail(status, canonicalStatus, transitionState, browserNow, tornNow, nearExpiryThresholdSec, expectedExpiryToleranceSec) {
     const timeRemainingSec = Math.round(
       (status.until ?? 0) - tornNow / 1e3
     );
@@ -1442,7 +1443,7 @@ submit(factionId, payload) {
         isNearExpiry: timeRemainingSec > 0 && timeRemainingSec < nearExpiryThresholdSec
       };
     }
-    if (timeRemainingSec >= 0) {
+    if (timeRemainingSec > expectedExpiryToleranceSec) {
       return {
         sortGroup: "UnexpectedOkay",
         route: null,
@@ -1617,7 +1618,8 @@ submit(factionId, payload) {
       watch: 500,
       minTimeBetweenRequests: 1e4,
       unexpectedHighlight: 1e4,
-      nearExpiryThresholdSec: 300
+      nearExpiryThresholdSec: 300,
+      expectedExpiryToleranceSec: 2
     },
     shouldRun() {
       return window.location.href.includes("factions.php");
@@ -2283,7 +2285,8 @@ submit(factionId, payload) {
               tornNow,
               {
                 unexpectedHighlightMs: UNEXPECTED_HIGHLIGHT_MS,
-                nearExpiryThresholdSec: WarMonitorFeature.intervals.nearExpiryThresholdSec
+                nearExpiryThresholdSec: WarMonitorFeature.intervals.nearExpiryThresholdSec,
+                expectedExpiryToleranceSec: WarMonitorFeature.intervals.expectedExpiryToleranceSec
               }
             );
             if (classification.nextTransitionState.unexpectedSince === null) {
