@@ -67,6 +67,8 @@ export interface ClassificationConfig {
   unexpectedHighlightMs: DurationMs;
   /** Near-expiry highlight threshold (CONTEXT.md). */
   nearExpiryThresholdSec: DurationSec;
+  /** Expiry tolerance (CONTEXT.md): exits this close to the scheduled end are expected. */
+  expectedExpiryToleranceSec: DurationSec;
 }
 
 export interface MemberClassification {
@@ -134,6 +136,7 @@ export function classifyMember(
       browserNow,
       tornNow,
       config.nearExpiryThresholdSec,
+      config.expectedExpiryToleranceSec,
     );
   } else if (status.state === "Traveling" || status.state === "Abroad") {
     decision = classifyTraveling(
@@ -190,6 +193,7 @@ function classifyHospitalOrJail(
   browserNow: TimestampMs,
   tornNow: TornTimestampMs,
   nearExpiryThresholdSec: DurationSec,
+  expectedExpiryToleranceSec: DurationSec,
 ): ClassificationDecision {
   // status.until is a Torn API Unix timestamp in seconds (ADR-0004); convert
   // tornNow (ms) to seconds here, at the comparison, rather than carrying a
@@ -208,9 +212,10 @@ function classifyHospitalOrJail(
     };
   }
 
-  if (timeRemainingSec >= 0) {
-    // Unexpected transition: API still shows time remaining but DOM hasn't
-    // confirmed hospital/jail — medded, revived, or an early jail release.
+  if (timeRemainingSec > expectedExpiryToleranceSec) {
+    // Unexpected transition: API still shows time remaining (beyond the expiry
+    // tolerance, which absorbs normal clock skew) but DOM hasn't confirmed
+    // hospital/jail — medded, revived, or an early jail release.
     return {
       sortGroup: SortGroup.UnexpectedOkay,
       route: null,
@@ -222,7 +227,8 @@ function classifyHospitalOrJail(
     };
   }
 
-  // Expected exit: timer has elapsed and DOM confirms Okay. Sort epoch is the
+  // Expected exit: timer has elapsed (or is within the expiry tolerance) and
+  // DOM confirms Okay. Sort epoch is the
   // hospital expiry time (Torn clock) so earlier-expiring members sort above
   // later ones — deterministic regardless of when we happened to poll.
   return {

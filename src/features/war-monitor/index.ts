@@ -85,6 +85,7 @@ interface WarMonitorFeatureType extends Feature {
     minTimeBetweenRequests: DurationMs;
     unexpectedHighlight: DurationMs;
     nearExpiryThresholdSec: DurationSec;
+    expectedExpiryToleranceSec: DurationSec;
   };
 }
 
@@ -100,6 +101,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
     minTimeBetweenRequests: 10_000,
     unexpectedHighlight: 10_000,
     nearExpiryThresholdSec: 300,
+    expectedExpiryToleranceSec: 2,
   },
 
   shouldRun(): boolean {
@@ -993,6 +995,8 @@ const WarMonitorFeature: WarMonitorFeatureType = {
               unexpectedHighlightMs: UNEXPECTED_HIGHLIGHT_MS,
               nearExpiryThresholdSec:
                 WarMonitorFeature.intervals.nearExpiryThresholdSec,
+              expectedExpiryToleranceSec:
+                WarMonitorFeature.intervals.expectedExpiryToleranceSec,
             },
           );
 

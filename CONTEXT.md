@@ -12,11 +12,14 @@ _Avoid_: API status, true status, real status
 **Augmented data**: Additional information the script overlays on top of canonical status, sourced from the Torn API — hospital countdown timers, travel destinations, chain state. Always secondary to canonical status.
 _Avoid_: API data (too broad), enriched status
 
-**Unexpected transition**: A status change that occurs faster than the game mechanics predict — a member going from Traveling to Okay (landed) or from Hospital to Okay before their hospital timer expires (medded). These transitions are surfaced to users as tactically significant events.
+**Unexpected transition**: A status change that occurs faster than the game mechanics predict — a member going from Traveling to Okay (landed) or from Hospital to Okay before their hospital timer expires (medded). A hospital/jail exit within the expiry tolerance is not an unexpected transition. These transitions are surfaced to users as tactically significant events.
 _Avoid_: Status discrepancy, status mismatch, STATUS_DIFFERS
 
-**Expected transition**: A status change at the natural end of a timed state — a hospitalized member whose timer reaches zero and returns to Okay.
+**Expected transition**: A status change at the natural end of a timed state — a hospitalized member whose timer reaches zero and returns to Okay. Includes exits observed with no more than the expiry tolerance left on the timer.
 _Avoid_: Natural transition, normal transition
+
+**Expiry tolerance**: The margin (2 seconds) before a hospital or jail timer's scheduled end within which an observed Okay still counts as an expected transition. Absorbs normal clock skew — Torn's clock-sync granularity and DOM update timing — so natural exits aren't misreported as meds-outs or revivals. Does not attempt to compensate for a skewed local clock when Torn's synced clock is unavailable.
+_Avoid_: Grace period, skew allowance
 
 **Meds-out** (verb: **medded**): An unexpected transition where a hospitalized member uses a medical item on themselves to reduce their hospital timer to zero, returning to Okay early. A subset of unexpected transitions.
 _Avoid_: Healed, revived

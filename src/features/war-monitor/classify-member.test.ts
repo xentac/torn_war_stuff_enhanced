@@ -22,6 +22,7 @@ const NO_TRANSITION: TransitionState = {
 const CONFIG: ClassificationConfig = {
   unexpectedHighlightMs: 10_000,
   nearExpiryThresholdSec: 300,
+  expectedExpiryToleranceSec: 2,
 };
 
 function okayStatus(): FactionMemberStatus {
@@ -30,6 +31,10 @@ function okayStatus(): FactionMemberStatus {
 
 function hospitalStatus(untilSec: TornTimestampSec): FactionMemberStatus {
   return { state: "Hospital", description: "In Hospital", until: untilSec };
+}
+
+function jailStatus(untilSec: TornTimestampSec): FactionMemberStatus {
+  return { state: "Jail", description: "In Jail", until: untilSec };
 }
 
 function travelingStatus(description: string): FactionMemberStatus {
@@ -268,6 +273,66 @@ describe("classifyMember — Hospital/Jail, DOM hasn't confirmed (canonicalStatu
     expect(result.nextTransitionState).toEqual({
       unexpectedSince: null,
       okaySince: (nowSec - 10) * 1000,
+    });
+  });
+
+  it("still flags an unexpected transition just beyond the expiry tolerance", () => {
+    const result = classifyMember(
+      hospitalStatus(nowSec + 3),
+      "Okay",
+      NO_TRANSITION,
+      now,
+      now,
+      CONFIG,
+    );
+
+    expect(result.sortGroup).toBe(SortGroup.UnexpectedOkay);
+  });
+
+  it("is an expected exit at exactly the expiry tolerance, anchored to the scheduled expiry", () => {
+    const result = classifyMember(
+      hospitalStatus(nowSec + 2),
+      "Okay",
+      NO_TRANSITION,
+      now,
+      now,
+      CONFIG,
+    );
+
+    expect(result.sortGroup).toBe(SortGroup.ExpectedOkay);
+    expect(result.nextTransitionState).toEqual({
+      unexpectedSince: null,
+      okaySince: (nowSec + 2) * 1000,
+    });
+  });
+
+  it("is an expected exit at exactly zero time remaining", () => {
+    const result = classifyMember(
+      hospitalStatus(nowSec),
+      "Okay",
+      NO_TRANSITION,
+      now,
+      now,
+      CONFIG,
+    );
+
+    expect(result.sortGroup).toBe(SortGroup.ExpectedOkay);
+  });
+
+  it("applies the expiry tolerance to jail exits as well", () => {
+    const result = classifyMember(
+      jailStatus(nowSec + 1),
+      "Okay",
+      NO_TRANSITION,
+      now,
+      now,
+      CONFIG,
+    );
+
+    expect(result.sortGroup).toBe(SortGroup.ExpectedOkay);
+    expect(result.nextTransitionState).toEqual({
+      unexpectedSince: null,
+      okaySince: (nowSec + 1) * 1000,
     });
   });
 });
