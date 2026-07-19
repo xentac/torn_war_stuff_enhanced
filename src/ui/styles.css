@@ -140,7 +140,7 @@
   position: fixed;
   bottom: 100px;
   right: 20px;
-  z-index: 9999;
+  z-index: 999999;
   background: rgba(30, 30, 30, 0.85);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
