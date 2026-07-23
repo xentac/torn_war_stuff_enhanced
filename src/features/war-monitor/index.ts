@@ -514,41 +514,63 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         copyBtn.className = "twse-copy-btn";
         copyBtn.type = "button";
         copyBtn.title = "Copy Name [ID]";
+        // Read back by the delegated click handler below rather than closed
+        // over, so this function never creates a per-row listener/closure.
+        copyBtn.setAttribute("data-player-id", id);
         copyBtn.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         `;
 
-        copyBtn.addEventListener("click", async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-
-          // Torn always sets this aria-label on the profile link; prefer it over
-          // textContent since third-party scripts (e.g. FF Scouter) can inject
-          // extra text (estimate values) inside the anchor's descendants.
-          const ariaMatch = atag
-            .getAttribute("aria-label")
-            ?.match(/^View profile of (.+)$/);
-          const name = ariaMatch
-            ? ariaMatch[1].trim()
-            : atag.textContent?.trim() || "";
-          const copyText = `${name} [${id}]`;
-
-          const success = await copyToClipboard(copyText);
-          if (success) {
-            copyBtn.classList.add("success");
-            copyBtn.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon-success"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            `;
-            setTimeout(() => {
-              copyBtn.classList.remove("success");
-              copyBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              `;
-            }, 1000);
-          }
-        });
-
         parent.appendChild(copyBtn);
+      }
+
+      // Delegated onto factWarList (stable for the whole monitor session)
+      // instead of attached per-button. Torn can replace whole rows (and
+      // re-trigger extractAllMemberLis/injectCopyButton for the new ones)
+      // without this code ever being told to tear down the previous set; a
+      // per-row listener there kept every detached row's button, its click
+      // closure, and everything that closure captured (the row's profile
+      // link, etc.) reachable indefinitely. A single delegated listener
+      // can't leak that way regardless of how many times rows are replaced.
+      async function onCopyButtonClick(e: Event) {
+        const target = e.target as HTMLElement | null;
+        const copyBtn = target?.closest<HTMLButtonElement>(".twse-copy-btn");
+        if (!copyBtn) return;
+        const id = copyBtn.getAttribute("data-player-id");
+        if (!id) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const li = copyBtn.closest("li");
+        const atag = li?.querySelector<HTMLAnchorElement>(
+          "a[href^='/profiles.php']",
+        );
+
+        // Torn always sets this aria-label on the profile link; prefer it over
+        // textContent since third-party scripts (e.g. FF Scouter) can inject
+        // extra text (estimate values) inside the anchor's descendants.
+        const ariaMatch = atag
+          ?.getAttribute("aria-label")
+          ?.match(/^View profile of (.+)$/);
+        const name = ariaMatch
+          ? ariaMatch[1].trim()
+          : atag?.textContent?.trim() || "";
+        const copyText = `${name} [${id}]`;
+
+        const success = await copyToClipboard(copyText);
+        if (success) {
+          copyBtn.classList.add("success");
+          copyBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon-success"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          `;
+          setTimeout(() => {
+            copyBtn.classList.remove("success");
+            copyBtn.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            `;
+          }, 1000);
+        }
       }
 
       // Extract faction member list details
@@ -1138,6 +1160,18 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       let innerDescriptionsObserver: MutationObserver | null = null;
 
       const initWarMonitoring = (descriptions: Element) => {
+        // Torn can replace the whole .descriptions container again (re-firing
+        // descriptionsObserver below) before a previous call here ever hit
+        // its own foundWar-and-injectedToggle disconnect. Reassigning
+        // innerDescriptionsObserver just below without this would orphan
+        // that still-active observer, which keeps the entire old (now
+        // detached) container reachable via normal parent->child DOM
+        // references until observeElement's own isConnected poll notices
+        // and disconnects it (up to 10s later, see utils/dom.ts) — this
+        // just closes that window immediately instead of waiting on it.
+        innerDescriptionsObserver?.disconnect();
+        innerDescriptionsObserver = null;
+
         foundWar = false;
         log.info("Descriptions container detected. Starting observation.");
 
@@ -1240,6 +1274,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       if (!active) return; // Guard against race conditions if stopped while waiting
 
       if (factWarList) {
+        factWarList.addEventListener("click", onCopyButtonClick);
         descriptionsObserver = new MutationObserver((mutations) => {
           for (const mutation of mutations) {
             for (const node of mutation.addedNodes) {
@@ -1330,6 +1365,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           window.removeEventListener("focus", onWindowFocus);
           window.removeEventListener("blur", onWindowBlur);
         }
+        factWarList?.removeEventListener("click", onCopyButtonClick);
 
         // 4. Remove UI/DOM elements
         if (bubbleContainer) {

@@ -247,7 +247,6 @@ class MockElement {
 
   dispatchEvent(event: any) {
     const type = event.type || event;
-    const list = this.listeners[type] || [];
     const ev = typeof event === "object" ? event : { type };
     try {
       ev.preventDefault = ev.preventDefault || (() => {});
@@ -260,7 +259,18 @@ class MockElement {
         configurable: true,
       });
     } catch {}
-    for (const cb of list) cb(ev);
+    // Bubble up the parentNode chain like a real DOM "click" does, so tests
+    // can exercise delegated listeners (e.g. war-monitor's copy button
+    // handler, registered once on a stable ancestor rather than per row).
+    // Real Event.stopPropagation() (used when `event` is a genuine Event
+    // instance, as `new Event(...)` is even under Node's polyfill) sets
+    // cancelBubble, which is what halts the walk below.
+    let node: MockElement | null = this;
+    while (node) {
+      for (const cb of node.listeners[type] || []) cb(ev);
+      if (ev.cancelBubble) break;
+      node = node.parentNode;
+    }
     return true;
   }
 
