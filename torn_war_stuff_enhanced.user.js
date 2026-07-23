@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced
 // @namespace    namespace
-// @version      2.0
+// @version      2.1
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
 // @match        https://www.torn.com/factions.php*
+// @require      https://www.torn.com/builds/react-umd/react-dom.19.2.0.93c06d8e.production.js
 // @connect      api.torn.com
 // @connect      twse.dev
 // @grant        GM_addStyle
@@ -253,6 +254,14 @@ get debug_logs() {
       this.storage.set("debug_logs", val);
       logger.setLevel(val ? LogLevel.DEBUG : LogLevel.INFO);
     }
+get debug_force_react_fallback() {
+      return this.storage.get(
+        "debug_force_react_fallback"
+) ?? false;
+    }
+    set debug_force_react_fallback(val) {
+      this.storage.set("debug_force_react_fallback", val);
+    }
 get war_sorting() {
       return this.storage.get(
         "war_sorting"
@@ -302,6 +311,9 @@ get copy_button_enabled() {
 reset() {
       this.storage.remove(
         "debug_logs"
+);
+      this.storage.remove(
+        "debug_force_react_fallback"
 );
       this.storage.remove(
         "war_sorting"
@@ -436,25 +448,40 @@ reset() {
     const right = parseInt(b.getAttribute(attr) || `${d}`, 10);
     return left - right;
   }
-  let _react$1;
-  function getReact$1() {
-    return _react$1 ??= unsafeWindow.React;
+  function unsafeWindowReact() {
+    return unsafeWindow;
+  }
+  function requiredReact() {
+    return globalThis;
+  }
+  function hasWorkingUnsafeWindowReact() {
+    const w = unsafeWindowReact();
+    return Boolean(w.React && w.ReactDOM);
+  }
+  function getReact() {
+    if (!twseconfig.debug_force_react_fallback && hasWorkingUnsafeWindowReact()) {
+      return unsafeWindowReact().React;
+    }
+    return requiredReact().React;
+  }
+  function getReactDOM() {
+    if (!twseconfig.debug_force_react_fallback && hasWorkingUnsafeWindowReact()) {
+      return unsafeWindowReact().ReactDOM;
+    }
+    return requiredReact().ReactDOM;
   }
   const FRAGMENT_SENTINEL = Symbol("ReactFragment");
   function jsx(type, { children, ...props }, key) {
-    const R = getReact$1();
+    const R = getReact();
+    const createElement2 = R.createElement;
     const realType = type === FRAGMENT_SENTINEL ? R.Fragment : type;
     if (key !== void 0) props.key = key;
     if (children === void 0) {
-      return R.createElement(realType, props);
+      return createElement2(realType, props);
     }
-    return Array.isArray(children) ? R.createElement(realType, props, ...children) : R.createElement(realType, props, children);
+    return Array.isArray(children) ? createElement2(realType, props, ...children) : createElement2(realType, props, children);
   }
   const jsxs = jsx;
-  let _react;
-  function getReact() {
-    return _react ??= unsafeWindow.React;
-  }
   new Proxy({}, {
     get(_, prop) {
       return getReact()[prop];
@@ -490,10 +517,6 @@ reset() {
       get: (_, prop) => getReact().Children[prop]
     }
   );
-  let _reactDOM;
-  function getReactDOM() {
-    return _reactDOM ??= unsafeWindow.ReactDOM;
-  }
   new Proxy({}, {
     get(_, prop) {
       return getReactDOM()[prop];
@@ -505,7 +528,8 @@ reset() {
     warSorting: true,
     bubbleEnabled: true,
     copyButtonEnabled: true,
-    debugLogs: false
+    debugLogs: false,
+    debugForceReactFallback: false
   };
   function SettingsPanelComponent({
     apiKey,
@@ -517,6 +541,7 @@ reset() {
     onBubbleEnabledDraftChange,
     onCopyButtonEnabledDraftChange,
     onDebugLogsDraftChange,
+    onDebugForceReactFallbackDraftChange,
     onSave,
     onReset,
     onClearCache,
@@ -605,6 +630,20 @@ jsx(
           ),
 jsx("label", { htmlFor: "twse-debug-logs", children: "Enable Developer/Debug Logging" })
         ] }),
+jsxs("div", { className: "input-row-inline", children: [
+jsx(
+            "input",
+            {
+              id: "twse-debug-force-react-fallback",
+              type: "checkbox",
+              checked: drafts.debugForceReactFallback,
+              onChange: (e) => onDebugForceReactFallbackDraftChange(
+                e.target.checked
+              )
+            }
+          ),
+jsx("label", { htmlFor: "twse-debug-force-react-fallback", children: "Force React fallback (@require'd copy instead of unsafeWindow.React/ReactDOM)" })
+        ] }),
 jsxs(
           "div",
           {
@@ -681,7 +720,8 @@ jsx(
         warSorting: this._props.warSorting,
         bubbleEnabled: this._props.bubbleEnabled,
         copyButtonEnabled: this._props.copyButtonEnabled,
-        debugLogs: this._props.debugLogs
+        debugLogs: this._props.debugLogs,
+        debugForceReactFallback: this._props.debugForceReactFallback
       };
     }
     render() {
@@ -728,6 +768,11 @@ jsx(
           },
           onDebugLogsDraftChange: (val) => {
             this._drafts.debugLogs = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onDebugForceReactFallbackDraftChange: (val) => {
+            this._drafts.debugForceReactFallback = val;
             this._showSavedMessage = false;
             this.render();
           },
@@ -779,7 +824,8 @@ jsx(
             warSorting: this._drafts.warSorting,
             bubbleEnabled: this._drafts.bubbleEnabled,
             copyButtonEnabled: this._drafts.copyButtonEnabled,
-            debugLogs: this._drafts.debugLogs
+            debugLogs: this._drafts.debugLogs,
+            debugForceReactFallback: this._drafts.debugForceReactFallback
           },
           bubbles: true,
           composed: true
@@ -826,6 +872,14 @@ get apiKey() {
       this._drafts.debugLogs = val;
       this.render();
     }
+    get debugForceReactFallback() {
+      return this._props.debugForceReactFallback;
+    }
+    set debugForceReactFallback(val) {
+      this._props.debugForceReactFallback = val;
+      this._drafts.debugForceReactFallback = val;
+      this.render();
+    }
 get draftApiKey() {
       return this._drafts.apiKey;
     }
@@ -861,8 +915,17 @@ get draftApiKey() {
       this._drafts.debugLogs = val;
       this.render();
     }
+    get draftDebugForceReactFallback() {
+      return this._drafts.debugForceReactFallback;
+    }
+    set draftDebugForceReactFallback(val) {
+      this._drafts.debugForceReactFallback = val;
+      this.render();
+    }
   }
-  customElements.define("twse-settings-panel", TWSESettingsPanel);
+  if (!customElements.get("twse-settings-panel")) {
+    customElements.define("twse-settings-panel", TWSESettingsPanel);
+  }
   const log$5 = logger.child("feature:settings");
   const SettingsFeature = {
     name: "Settings",
@@ -883,6 +946,7 @@ get draftApiKey() {
       panel.bubbleEnabled = twseconfig.bubble_enabled;
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
       panel.debugLogs = twseconfig.debug_logs;
+      panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
       panel.addEventListener("twse-save", (e) => {
         const detail = e.detail;
         twseconfig.apiKey = detail.apiKey;
@@ -890,6 +954,7 @@ get draftApiKey() {
         twseconfig.bubble_enabled = detail.bubbleEnabled;
         twseconfig.copy_button_enabled = detail.copyButtonEnabled;
         twseconfig.debug_logs = detail.debugLogs;
+        twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
         log$5.info("Settings saved successfully");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
@@ -900,6 +965,7 @@ get draftApiKey() {
         panel.bubbleEnabled = twseconfig.bubble_enabled;
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
         panel.debugLogs = twseconfig.debug_logs;
+        panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
         log$5.info("Settings reset to defaults");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
@@ -1297,7 +1363,7 @@ submit(factionId, payload) {
     }
   }
   const twseClient = new TwseServerClient();
-  const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:9999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}";
+  const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}";
   importCSS(stylesCss);
   var SortGroup = ((SortGroup2) => {
     SortGroup2["UnexpectedOkay"] = "UnexpectedOkay";
@@ -1330,7 +1396,8 @@ submit(factionId, payload) {
         transitionState,
         browserNow,
         tornNow,
-        config.nearExpiryThresholdSec
+        config.nearExpiryThresholdSec,
+        config.expectedExpiryToleranceSec
       );
     } else if (status.state === "Traveling" || status.state === "Abroad") {
       decision = classifyTraveling(
@@ -1364,7 +1431,7 @@ submit(factionId, payload) {
       isNearExpiry: false
     };
   }
-  function classifyHospitalOrJail(status, canonicalStatus, transitionState, browserNow, tornNow, nearExpiryThresholdSec) {
+  function classifyHospitalOrJail(status, canonicalStatus, transitionState, browserNow, tornNow, nearExpiryThresholdSec, expectedExpiryToleranceSec) {
     const timeRemainingSec = Math.round(
       (status.until ?? 0) - tornNow / 1e3
     );
@@ -1376,7 +1443,7 @@ submit(factionId, payload) {
         isNearExpiry: timeRemainingSec > 0 && timeRemainingSec < nearExpiryThresholdSec
       };
     }
-    if (timeRemainingSec >= 0) {
+    if (timeRemainingSec > expectedExpiryToleranceSec) {
       return {
         sortGroup: "UnexpectedOkay",
         route: null,
@@ -1551,7 +1618,8 @@ submit(factionId, payload) {
       watch: 500,
       minTimeBetweenRequests: 1e4,
       unexpectedHighlight: 1e4,
-      nearExpiryThresholdSec: 300
+      nearExpiryThresholdSec: 300,
+      expectedExpiryToleranceSec: 2
     },
     shouldRun() {
       return window.location.href.includes("factions.php");
@@ -1848,30 +1916,40 @@ submit(factionId, payload) {
           copyBtn.className = "twse-copy-btn";
           copyBtn.type = "button";
           copyBtn.title = "Copy Name [ID]";
+          copyBtn.setAttribute("data-player-id", id);
           copyBtn.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         `;
-          copyBtn.addEventListener("click", async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const ariaMatch = atag.getAttribute("aria-label")?.match(/^View profile of (.+)$/);
-            const name = ariaMatch ? ariaMatch[1].trim() : atag.textContent?.trim() || "";
-            const copyText = `${name} [${id}]`;
-            const success = await copyToClipboard(copyText);
-            if (success) {
-              copyBtn.classList.add("success");
-              copyBtn.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon-success"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            `;
-              setTimeout(() => {
-                copyBtn.classList.remove("success");
-                copyBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              `;
-              }, 1e3);
-            }
-          });
           parent.appendChild(copyBtn);
+        }
+        async function onCopyButtonClick(e) {
+          const target = e.target;
+          const copyBtn = target?.closest(".twse-copy-btn");
+          if (!copyBtn) return;
+          const id = copyBtn.getAttribute("data-player-id");
+          if (!id) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const li = copyBtn.closest("li");
+          const atag = li?.querySelector(
+            "a[href^='/profiles.php']"
+          );
+          const ariaMatch = atag?.getAttribute("aria-label")?.match(/^View profile of (.+)$/);
+          const name = ariaMatch ? ariaMatch[1].trim() : atag?.textContent?.trim() || "";
+          const copyText = `${name} [${id}]`;
+          const success = await copyToClipboard(copyText);
+          if (success) {
+            copyBtn.classList.add("success");
+            copyBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon-success"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          `;
+            setTimeout(() => {
+              copyBtn.classList.remove("success");
+              copyBtn.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            `;
+            }, 1e3);
+          }
         }
         function extractAllMemberLis() {
           memberLis.clear();
@@ -2217,7 +2295,8 @@ submit(factionId, payload) {
               tornNow,
               {
                 unexpectedHighlightMs: UNEXPECTED_HIGHLIGHT_MS,
-                nearExpiryThresholdSec: WarMonitorFeature.intervals.nearExpiryThresholdSec
+                nearExpiryThresholdSec: WarMonitorFeature.intervals.nearExpiryThresholdSec,
+                expectedExpiryToleranceSec: WarMonitorFeature.intervals.expectedExpiryToleranceSec
               }
             );
             if (classification.nextTransitionState.unexpectedSince === null) {
@@ -2326,6 +2405,8 @@ submit(factionId, payload) {
         let descriptionsObserver = null;
         let innerDescriptionsObserver = null;
         const initWarMonitoring = (descriptions) => {
+          innerDescriptionsObserver?.disconnect();
+          innerDescriptionsObserver = null;
           foundWar = false;
           log$1.info("Descriptions container detected. Starting observation.");
           let injectedToggle = false;
@@ -2408,6 +2489,7 @@ submit(factionId, payload) {
         const factWarList = await waitForElement("#faction_war_list_id");
         if (!active) return;
         if (factWarList) {
+          factWarList.addEventListener("click", onCopyButtonClick);
           descriptionsObserver = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
               for (const node of mutation.addedNodes) {
@@ -2480,6 +2562,7 @@ submit(factionId, payload) {
             window.removeEventListener("focus", onWindowFocus);
             window.removeEventListener("blur", onWindowBlur);
           }
+          factWarList?.removeEventListener("click", onCopyButtonClick);
           if (bubbleContainer) {
             bubbleContainer.remove();
             bubbleContainer = null;
