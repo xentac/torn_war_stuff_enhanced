@@ -59,7 +59,7 @@ Per the [Torn API Terms of Service](https://www.torn.com/api.html#), here's what
 
 Found a bug or have a feature request? [Open an issue on GitHub](https://github.com/xentac/torn_war_stuff_enhanced/issues).
 
-Support is also available in the [FF Scouter discord server](https://discord.gg/cndwEmVSd).
+Support is also available in the [FF Scouter discord server](https://ffscouter.com/discord).
 
 ## Disclaimer
 
