@@ -1,0 +1,56 @@
+{
+  "name": "Torn War Stuff Enhanced (Claude Code)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  // Bun (this repo's runtime/package manager), GitHub CLI, and the official
+  // Claude Code CLI feature
+  "features": {
+    "ghcr.io/devcontainers-extra/features/bun:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  // Required for init-firewall.sh to manage iptables/ipset inside the container
+  "runArgs": [
+    "--cap-add=NET_ADMIN",
+    "--cap-add=NET_RAW"
+  ],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        // Automatically formats on save using this repo's linter (biome), not prettier
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "biomejs.biome",
+        "[typescript]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        }
+      },
+      "extensions": [
+        "biomejs.biome",
+        "anthropic.claude-code"
+      ]
+    }
+  },
+  // This base image's non-root user is "node" (uid 1000), not "vscode"
+  "remoteUser": "node",
+  // Persist Claude Code credentials/config and shell history across rebuilds,
+  // and bind-mount the host's jj identity in read-only so `jj commit` etc.
+  // work without duplicating name/email into the image
+  "mounts": [
+    "source=torn-war-stuff-enhanced-claude-config-${devcontainerId},target=/home/node/.claude,type=volume",
+    "source=torn-war-stuff-enhanced-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=${localEnv:HOME}/.config/jj/config.toml,target=/home/node/.config/jj/config.toml,type=bind,readonly"
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude"
+  },
+  // Run initial installation and diagnostic checks after container creation
+  "postCreateCommand": "node --version && npm --version && bun --version && jj --version && gh --version",
+  "postStartCommand": "sudo bash /workspaces/torn_war_stuff_enhanced/.devcontainer/init-firewall.sh",
+  "waitFor": "postStartCommand"
+}
