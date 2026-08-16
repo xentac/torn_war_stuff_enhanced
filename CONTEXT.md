@@ -57,6 +57,12 @@ _Avoid_: Collection service, community cache, cache service, API proxy
 _Avoid_: Interop attribute, export field
 _Avoid_: API timestamp, request timestamp, response time, client timestamp
 
+**Total stat estimate**: FF Scouter's estimate of a player's total battle stats, consumed from that script's per-row data rather than sourced from the Torn API. This is the value the sort-by-estimate tie-break and the rich copy format both use.
+_Avoid_: Estimate, stat estimate (ambiguous with Fair Fight value), FF value
+
+**Fair Fight value**: FF Scouter's difficulty multiplier for a fight against a player, shown in that script's own column. Distinct from the Total stat estimate — this script does not read or use it anywhere.
+_Avoid_: FF, estimate
+
 ### UI framework
 
 **Page React**: `react`/`react-dom/client` are never bundled into the shipped `.user.js`. The build aliases them (`vite.config.ts`) to shims (`src/shims/react.ts`, `src/shims/react-dom.ts`, via the shared `src/shims/react-loader.ts`) that prefer `unsafeWindow.React`/`.ReactDOM` at call time, borrowing the copy Torn's own page already loads, saving ~500KB+ of shipped code. Depends on the userscript manager's cross-realm object bridging actually working; unreliable on at least one Safari/Tampermonkey configuration, where it falls back instead to the same-realm copy set up by `@require`ing Torn's own react-dom UMD build (`vite.config.ts`) — see ADR-0008.

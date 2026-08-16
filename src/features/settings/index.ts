@@ -32,6 +32,7 @@ const SettingsFeature: Feature = {
     panel.warSorting = twseconfig.war_sorting;
     panel.bubbleEnabled = twseconfig.bubble_enabled;
     panel.copyButtonEnabled = twseconfig.copy_button_enabled;
+    panel.copyFormat = twseconfig.copy_format;
     panel.debugLogs = twseconfig.debug_logs;
     panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 
@@ -42,6 +43,7 @@ const SettingsFeature: Feature = {
       twseconfig.war_sorting = detail.warSorting;
       twseconfig.bubble_enabled = detail.bubbleEnabled;
       twseconfig.copy_button_enabled = detail.copyButtonEnabled;
+      twseconfig.copy_format = detail.copyFormat;
       twseconfig.debug_logs = detail.debugLogs;
       twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
 
@@ -60,6 +62,7 @@ const SettingsFeature: Feature = {
       panel.warSorting = twseconfig.war_sorting;
       panel.bubbleEnabled = twseconfig.bubble_enabled;
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
+      panel.copyFormat = twseconfig.copy_format;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 

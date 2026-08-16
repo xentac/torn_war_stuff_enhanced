@@ -8,6 +8,7 @@ import {
   sort_by_attribute,
   waitForElement,
 } from "@utils/dom";
+import { formatStatEstimate } from "@utils/format";
 import logger from "@utils/logger";
 import {
   calc_delta,
@@ -454,7 +455,39 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         window.addEventListener("blur", onWindowBlur);
       }
 
-      async function copyToClipboard(text: string): Promise<boolean> {
+      async function copyToClipboard(
+        content: string | { html: string },
+      ): Promise<boolean> {
+        // For rich content, the plaintext fallback is the same raw HTML
+        // markup string (not stripped) — a plain-text-only paste target
+        // shows literal <a href="..."> tags, but that beats copying nothing.
+        const text = typeof content === "string" ? content : content.html;
+
+        // 0. Try a rich HTML+plaintext clipboard write first, if there's
+        // HTML to write and the browser supports it. No await happens
+        // before this call: Safari drops clipboard write permission across
+        // an await.
+        if (typeof content !== "string") {
+          try {
+            if (
+              typeof ClipboardItem !== "undefined" &&
+              navigator.clipboard?.write
+            ) {
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  "text/html": new Blob([content.html], {
+                    type: "text/html",
+                  }),
+                  "text/plain": new Blob([text], { type: "text/plain" }),
+                }),
+              ]);
+              return true;
+            }
+          } catch (err) {
+            log.error("Failed to copy rich content using clipboard.write", err);
+          }
+        }
+
         // 1. Try Torn PDA handler if present
         if (
           typeof window !== "undefined" &&
@@ -499,6 +532,32 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
       }
 
+      // Builds the "Name - Stat estimate - Attack link" rich copy content
+      // (see CONTEXT.md's Total stat estimate entry). The stat estimate
+      // segment is omitted whenever data-est-value doesn't parse to a finite
+      // positive number: absent (FF Scouter not installed), "" (FF Scouter
+      // installed but has no data for this player yet), or garbage all fall
+      // through to the same check.
+      function buildRichCopyContent(
+        name: string,
+        id: string,
+        li: HTMLLIElement | null,
+      ): { html: string } {
+        const profileUrl = `https://www.torn.com/profiles.php?XID=${id}`;
+        const attackUrl = `https://www.torn.com/page.php?sid=attack&user2ID=${id}`;
+
+        const rawEstimate = Number(li?.getAttribute("data-est-value"));
+        const estimate =
+          Number.isFinite(rawEstimate) && rawEstimate > 0
+            ? formatStatEstimate(rawEstimate)
+            : null;
+        const middle = estimate ? ` - ${estimate}` : "";
+
+        const html = `<a href="${profileUrl}">${name} [${id}]</a>${middle} - <a href="${attackUrl.replace(/&/g, "&amp;")}">Attack</a>`;
+
+        return { html };
+      }
+
       function injectCopyButton(id: string, li: HTMLLIElement) {
         if (li.querySelector(".twse-copy-btn")) return;
 
@@ -513,7 +572,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         const copyBtn = document.createElement("button");
         copyBtn.className = "twse-copy-btn";
         copyBtn.type = "button";
-        copyBtn.title = "Copy Name [ID]";
+        copyBtn.title = "Copy player info";
         // Read back by the delegated click handler below rather than closed
         // over, so this function never creates a per-row listener/closure.
         copyBtn.setAttribute("data-player-id", id);
@@ -556,9 +615,13 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         const name = ariaMatch
           ? ariaMatch[1].trim()
           : atag?.textContent?.trim() || "";
-        const copyText = `${name} [${id}]`;
 
-        const success = await copyToClipboard(copyText);
+        const content =
+          twseconfig.copy_format === "rich"
+            ? buildRichCopyContent(name, id, li)
+            : `${name} [${id}]`;
+
+        const success = await copyToClipboard(content);
         if (success) {
           copyBtn.classList.add("success");
           copyBtn.innerHTML = `

@@ -1,3 +1,4 @@
+import type { CopyFormat } from "@utils/config";
 import { createElement, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -6,6 +7,7 @@ const DEFAULT_VALUES = {
   warSorting: true,
   bubbleEnabled: true,
   copyButtonEnabled: true,
+  copyFormat: "name_id" as CopyFormat,
   debugLogs: false,
   debugForceReactFallback: false,
 };
@@ -19,6 +21,7 @@ type SettingsPanelComponentProps = {
   onWarSortingDraftChange: (val: boolean) => void;
   onBubbleEnabledDraftChange: (val: boolean) => void;
   onCopyButtonEnabledDraftChange: (val: boolean) => void;
+  onCopyFormatDraftChange: (val: CopyFormat) => void;
   onDebugLogsDraftChange: (val: boolean) => void;
   onDebugForceReactFallbackDraftChange: (val: boolean) => void;
   onSave: () => void;
@@ -36,6 +39,7 @@ export function SettingsPanelComponent({
   onWarSortingDraftChange,
   onBubbleEnabledDraftChange,
   onCopyButtonEnabledDraftChange,
+  onCopyFormatDraftChange,
   onDebugLogsDraftChange,
   onDebugForceReactFallbackDraftChange,
   onSave,
@@ -127,8 +131,27 @@ export function SettingsPanelComponent({
             }
           />
           <label htmlFor="twse-copy-btn-toggle">
-            Enable "Copy Name [ID]" Button next to members
+            Enable copy button next to members
           </label>
+        </div>
+
+        {/* Copy format */}
+        <div className="input-row-inline">
+          <label htmlFor="twse-copy-format">Copy format:</label>
+          <select
+            id="twse-copy-format"
+            value={drafts.copyFormat}
+            onChange={(e) =>
+              onCopyFormatDraftChange(
+                (e.target as HTMLSelectElement).value as CopyFormat,
+              )
+            }
+          >
+            <option value="name_id">Name [ID]</option>
+            <option value="rich">
+              Name [ID] - Stat estimate - Attack link
+            </option>
+          </select>
         </div>
 
         {/* Debug logs toggle */}
@@ -242,6 +265,7 @@ export class TWSESettingsPanel extends HTMLElement {
       warSorting: this._props.warSorting,
       bubbleEnabled: this._props.bubbleEnabled,
       copyButtonEnabled: this._props.copyButtonEnabled,
+      copyFormat: this._props.copyFormat,
       debugLogs: this._props.debugLogs,
       debugForceReactFallback: this._props.debugForceReactFallback,
     };
@@ -288,6 +312,11 @@ export class TWSESettingsPanel extends HTMLElement {
         },
         onCopyButtonEnabledDraftChange: (val) => {
           this._drafts.copyButtonEnabled = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onCopyFormatDraftChange: (val) => {
+          this._drafts.copyFormat = val;
           this._showSavedMessage = false;
           this.render();
         },
@@ -355,6 +384,7 @@ export class TWSESettingsPanel extends HTMLElement {
           warSorting: this._drafts.warSorting,
           bubbleEnabled: this._drafts.bubbleEnabled,
           copyButtonEnabled: this._drafts.copyButtonEnabled,
+          copyFormat: this._drafts.copyFormat,
           debugLogs: this._drafts.debugLogs,
           debugForceReactFallback: this._drafts.debugForceReactFallback,
         },
@@ -398,6 +428,15 @@ export class TWSESettingsPanel extends HTMLElement {
   set copyButtonEnabled(val: boolean) {
     this._props.copyButtonEnabled = val;
     this._drafts.copyButtonEnabled = val;
+    this.render();
+  }
+
+  get copyFormat() {
+    return this._props.copyFormat;
+  }
+  set copyFormat(val: CopyFormat) {
+    this._props.copyFormat = val;
+    this._drafts.copyFormat = val;
     this.render();
   }
 
@@ -449,6 +488,14 @@ export class TWSESettingsPanel extends HTMLElement {
   }
   set draftCopyButtonEnabled(val: boolean) {
     this._drafts.copyButtonEnabled = val;
+    this.render();
+  }
+
+  get draftCopyFormat() {
+    return this._drafts.copyFormat;
+  }
+  set draftCopyFormat(val: CopyFormat) {
+    this._drafts.copyFormat = val;
     this.render();
   }
 

@@ -10,7 +10,10 @@ enum CONFIG_KEYS {
   BUBBLE_MINIMIZED = "bubble_minimized",
   BUBBLE_ENABLED = "bubble_enabled",
   COPY_BUTTON_ENABLED = "copy_button_enabled",
+  COPY_FORMAT = "copy_format",
 }
+
+export type CopyFormat = "name_id" | "rich";
 
 export class Config {
   private storage: Storage;
@@ -145,6 +148,18 @@ export class Config {
   }
 
   /**
+   * Gets the format the player copy button copies: "name_id" for the plain
+   * "Name [ID]" text, "rich" for the name/stat-estimate/attack-link format.
+   */
+  get copy_format(): CopyFormat {
+    return this.storage.get<CopyFormat>(CONFIG_KEYS.COPY_FORMAT) ?? "name_id";
+  }
+
+  set copy_format(val: CopyFormat) {
+    this.storage.set(CONFIG_KEYS.COPY_FORMAT, val);
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
@@ -155,6 +170,7 @@ export class Config {
     this.storage.remove(CONFIG_KEYS.BUBBLE_MINIMIZED);
     this.storage.remove(CONFIG_KEYS.BUBBLE_ENABLED);
     this.storage.remove(CONFIG_KEYS.COPY_BUTTON_ENABLED);
+    this.storage.remove(CONFIG_KEYS.COPY_FORMAT);
   }
 }
 

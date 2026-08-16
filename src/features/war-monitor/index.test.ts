@@ -677,6 +677,154 @@ describe("WarMonitorFeature Sorting Config", () => {
     }
   });
 
+  function setupRichCopyRow(estValue: string | null) {
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+
+    const li = new MockElement("li");
+    li.className = "enemy";
+    if (estValue !== null) {
+      li.setAttribute("data-est-value", estValue);
+    }
+
+    const memberCol = new MockElement("div");
+    memberCol.className = "member";
+
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/profiles.php?XID=347472");
+    atag.setAttribute("aria-label", "View profile of Asprin50");
+    atag.textContent = "Asprin50";
+
+    const statusDiv = new MockElement("div");
+    statusDiv.className = "status ok";
+
+    memberCol.appendChild(atag);
+    li.appendChild(memberCol);
+    li.appendChild(statusDiv);
+    ul.appendChild(li);
+    descriptions.appendChild(ul);
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    return memberCol;
+  }
+
+  function mockRichClipboard() {
+    const clipboardWriteTextMock = vi.fn().mockResolvedValue(undefined);
+    const clipboardWriteMock = vi.fn().mockResolvedValue(undefined);
+    if (!global.navigator) {
+      global.navigator = {} as any;
+    }
+    Object.defineProperty(global.navigator, "clipboard", {
+      value: { writeText: clipboardWriteTextMock, write: clipboardWriteMock },
+      writable: true,
+      configurable: true,
+    });
+    (global.window as any).flutter_inappwebview = undefined;
+    (global as any).ClipboardItem = class {
+      constructor(public items: Record<string, unknown>) {}
+    };
+    return { clipboardWriteTextMock, clipboardWriteMock };
+  }
+
+  it("should copy rich HTML+plaintext (name [ID], estimate, attack link) when the rich copy format is selected", async () => {
+    twseconfig.copy_format = "rich";
+    const memberCol = setupRichCopyRow("940616747829");
+    const { clipboardWriteMock, clipboardWriteTextMock } = mockRichClipboard();
+
+    try {
+      WarMonitorFeature.run();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const copyBtn = memberCol.querySelector(".twse-copy-btn");
+      expect(copyBtn).not.toBeNull();
+
+      if (copyBtn) {
+        await copyBtn.dispatchEvent(new Event("click"));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(clipboardWriteMock).toHaveBeenCalledTimes(1);
+        expect(clipboardWriteTextMock).not.toHaveBeenCalled();
+
+        const [clipboardItem] = clipboardWriteMock.mock.calls[0][0];
+        const expected =
+          '<a href="https://www.torn.com/profiles.php?XID=347472">Asprin50 [347472]</a> - 941b - <a href="https://www.torn.com/page.php?sid=attack&amp;user2ID=347472">Attack</a>';
+        expect(await clipboardItem.items["text/html"].text()).toBe(expected);
+        // The plaintext fallback is the same raw HTML markup, not stripped.
+        expect(await clipboardItem.items["text/plain"].text()).toBe(expected);
+        expect(copyBtn.className).toContain("success");
+      }
+    } finally {
+      delete (global as any).ClipboardItem;
+    }
+  });
+
+  it("should omit the stat estimate segment when FF Scouter has no data for the player", async () => {
+    twseconfig.copy_format = "rich";
+    const memberCol = setupRichCopyRow(""); // FF Scouter installed, no data yet
+    const { clipboardWriteMock } = mockRichClipboard();
+
+    try {
+      WarMonitorFeature.run();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const copyBtn = memberCol.querySelector(".twse-copy-btn");
+      expect(copyBtn).not.toBeNull();
+
+      if (copyBtn) {
+        await copyBtn.dispatchEvent(new Event("click"));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const [clipboardItem] = clipboardWriteMock.mock.calls[0][0];
+        expect(await clipboardItem.items["text/html"].text()).toBe(
+          '<a href="https://www.torn.com/profiles.php?XID=347472">Asprin50 [347472]</a> - <a href="https://www.torn.com/page.php?sid=attack&amp;user2ID=347472">Attack</a>',
+        );
+      }
+    } finally {
+      delete (global as any).ClipboardItem;
+    }
+  });
+
+  it("should fall back to PDA/writeText/execCommand with the raw HTML markup as plain text when the browser doesn't support rich clipboard writes", async () => {
+    twseconfig.copy_format = "rich";
+    const memberCol = setupRichCopyRow("940616747829");
+
+    if (!global.navigator) {
+      global.navigator = {} as any;
+    }
+    Object.defineProperty(global.navigator, "clipboard", {
+      value: {},
+      writable: true,
+      configurable: true,
+    });
+    const pdaCallHandlerMock = vi.fn().mockResolvedValue(undefined);
+    (global.window as any).flutter_inappwebview = {
+      callHandler: pdaCallHandlerMock,
+    };
+    // No global.ClipboardItem in this environment, so the rich write path
+    // is unavailable and copyToClipboard must fall through to PDA.
+
+    WarMonitorFeature.run();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const copyBtn = memberCol.querySelector(".twse-copy-btn");
+    expect(copyBtn).not.toBeNull();
+
+    if (copyBtn) {
+      await copyBtn.dispatchEvent(new Event("click"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(pdaCallHandlerMock).toHaveBeenCalledWith(
+        "copyToClipboard",
+        '<a href="https://www.torn.com/profiles.php?XID=347472">Asprin50 [347472]</a> - 941b - <a href="https://www.torn.com/page.php?sid=attack&amp;user2ID=347472">Attack</a>',
+      );
+      expect(copyBtn.className).toContain("success");
+    }
+  });
+
   it("should create floating bubble and update chain status when active chains are fetched", async () => {
     const { tornApi } = await import("@utils/api");
     const { twseconfig } = await import("@utils/config");
