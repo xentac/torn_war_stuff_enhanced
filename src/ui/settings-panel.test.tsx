@@ -39,6 +39,12 @@ test("twse-settings-panel renders defaults correctly", async () => {
   ) as HTMLInputElement;
   expect(twseServerCheckbox).not.toBeNull();
   expect(twseServerCheckbox.checked).toBe(true);
+
+  const revivableIndicatorCheckbox = el.querySelector(
+    "#twse-revivable-indicator-toggle",
+  ) as HTMLInputElement;
+  expect(revivableIndicatorCheckbox).not.toBeNull();
+  expect(revivableIndicatorCheckbox.checked).toBe(true);
 });
 
 test("twse-settings-panel reflects property changes dynamically", async () => {
@@ -47,6 +53,7 @@ test("twse-settings-panel reflects property changes dynamically", async () => {
   el.warSorting = false;
   el.bubbleEnabled = false;
   el.twseServerEnabled = false;
+  el.revivableIndicatorEnabled = false;
 
   document.body.appendChild(el);
   await el.updateComplete;
@@ -68,6 +75,11 @@ test("twse-settings-panel reflects property changes dynamically", async () => {
     "#twse-server-enabled",
   ) as HTMLInputElement;
   expect(twseServerCheckbox.checked).toBe(false);
+
+  const revivableIndicatorCheckbox = el.querySelector(
+    "#twse-revivable-indicator-toggle",
+  ) as HTMLInputElement;
+  expect(revivableIndicatorCheckbox.checked).toBe(false);
 });
 
 test("twse-settings-panel updates drafts on input/change", async () => {
@@ -97,6 +109,14 @@ test("twse-settings-panel updates drafts on input/change", async () => {
   await el.updateComplete;
 
   expect(el.draftTwseServerEnabled).toBe(false);
+
+  const revivableIndicatorCheckbox = el.querySelector(
+    "#twse-revivable-indicator-toggle",
+  ) as HTMLInputElement;
+  revivableIndicatorCheckbox.click();
+  await el.updateComplete;
+
+  expect(el.draftRevivableIndicatorEnabled).toBe(false);
 });
 
 test("twse-settings-panel dispatches twse-save event on save button click", async () => {
@@ -122,6 +142,7 @@ test("twse-settings-panel dispatches twse-save event on save button click", asyn
   expect(event.detail.apiKey).toBe("new-saved-key-99");
   expect(event.detail.warSorting).toBe(true);
   expect(event.detail.twseServerEnabled).toBe(true);
+  expect(event.detail.revivableIndicatorEnabled).toBe(true);
 });
 
 test("twse-settings-panel dispatches twse-reset event on reset button click", async () => {

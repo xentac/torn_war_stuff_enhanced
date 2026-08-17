@@ -34,6 +34,7 @@ const SettingsFeature: Feature = {
     panel.copyButtonEnabled = twseconfig.copy_button_enabled;
     panel.copyFormat = twseconfig.copy_format;
     panel.twseServerEnabled = twseconfig.twse_server_enabled;
+    panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
     panel.debugLogs = twseconfig.debug_logs;
     panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 
@@ -46,6 +47,7 @@ const SettingsFeature: Feature = {
       twseconfig.copy_button_enabled = detail.copyButtonEnabled;
       twseconfig.copy_format = detail.copyFormat;
       twseconfig.twse_server_enabled = detail.twseServerEnabled;
+      twseconfig.revivable_indicator_enabled = detail.revivableIndicatorEnabled;
       twseconfig.debug_logs = detail.debugLogs;
       twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
 
@@ -66,6 +68,7 @@ const SettingsFeature: Feature = {
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
       panel.copyFormat = twseconfig.copy_format;
       panel.twseServerEnabled = twseconfig.twse_server_enabled;
+      panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 

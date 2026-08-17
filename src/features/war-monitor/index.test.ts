@@ -1282,6 +1282,7 @@ describe("WarMonitorFeature Sorting Config", () => {
       documentMock.body = new MockElement("body");
       twseconfig.bubble_enabled = true;
       twseconfig.copy_button_enabled = true;
+      twseconfig.revivable_indicator_enabled = true;
 
       // Minimal DOM so waitForElement("#faction_war_list_id") resolves
       // immediately, letting startMonitor() reach its stopMonitor
@@ -1308,10 +1309,14 @@ describe("WarMonitorFeature Sorting Config", () => {
       // Initial state: default true meaning no disabled class
       expect(documentMock.body.className).not.toContain("twse-bubble-disabled");
       expect(documentMock.body.className).not.toContain("twse-copy-disabled");
+      expect(documentMock.body.className).not.toContain(
+        "twse-revivable-disabled",
+      );
 
       // Toggle configurations
       twseconfig.bubble_enabled = false;
       twseconfig.copy_button_enabled = false;
+      twseconfig.revivable_indicator_enabled = false;
 
       // Dispatch event to simulate panel saving/config updated
       window.dispatchEvent(new Event("twse-config-updated"));
@@ -1319,14 +1324,19 @@ describe("WarMonitorFeature Sorting Config", () => {
       // Verify that classes are correctly updated
       expect(documentMock.body.className).toContain("twse-bubble-disabled");
       expect(documentMock.body.className).toContain("twse-copy-disabled");
+      expect(documentMock.body.className).toContain("twse-revivable-disabled");
 
       // Toggle them back
       twseconfig.bubble_enabled = true;
       twseconfig.copy_button_enabled = true;
+      twseconfig.revivable_indicator_enabled = true;
       window.dispatchEvent(new Event("twse-config-updated"));
 
       expect(documentMock.body.className).not.toContain("twse-bubble-disabled");
       expect(documentMock.body.className).not.toContain("twse-copy-disabled");
+      expect(documentMock.body.className).not.toContain(
+        "twse-revivable-disabled",
+      );
     });
 
     it("should support purging caches when twse-clear-cache event is dispatched", async () => {

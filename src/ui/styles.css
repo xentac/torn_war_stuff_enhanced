@@ -18,14 +18,23 @@
 /* Revivable indicator: a "+" overlaid inside the status div's own box (no
    padding, no offset outside the box) so it can neither grow the box nor
    spill into a neighboring cell. Red = revivable by anyone, purple =
-   friends & faction only. */
-.members-list div.status[data-twse-revivable="everyone"],
-.members-list div.status[data-twse-revivable="friends-faction"] {
+   friends & faction only. Gated by body.twse-revivable-disabled (the
+   revivable_indicator_enabled setting) so toggling it off applies instantly
+   without touching the underlying data-twse-revivable attribute. */
+body:not(.twse-revivable-disabled) .members-list
+  div.status[data-twse-revivable="everyone"],
+body:not(.twse-revivable-disabled)
+  .members-list
+  div.status[data-twse-revivable="friends-faction"] {
   position: relative !important;
 }
 
-.members-list div.status[data-twse-revivable="everyone"]::before,
-.members-list div.status[data-twse-revivable="friends-faction"]::before {
+body:not(.twse-revivable-disabled)
+  .members-list
+  div.status[data-twse-revivable="everyone"]::before,
+body:not(.twse-revivable-disabled)
+  .members-list
+  div.status[data-twse-revivable="friends-faction"]::before {
   content: "+";
   position: absolute;
   left: 2px;
@@ -36,11 +45,15 @@
   line-height: 1;
 }
 
-.members-list div.status[data-twse-revivable="everyone"]::before {
+body:not(.twse-revivable-disabled)
+  .members-list
+  div.status[data-twse-revivable="everyone"]::before {
   color: #ef4444 !important;
 }
 
-.members-list div.status[data-twse-revivable="friends-faction"]::before {
+body:not(.twse-revivable-disabled)
+  .members-list
+  div.status[data-twse-revivable="friends-faction"]::before {
   color: #a06bf0 !important;
 }
 

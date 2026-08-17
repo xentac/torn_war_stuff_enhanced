@@ -12,6 +12,7 @@ enum CONFIG_KEYS {
   COPY_BUTTON_ENABLED = "copy_button_enabled",
   COPY_FORMAT = "copy_format",
   TWSE_SERVER_ENABLED = "twse_server_enabled",
+  REVIVABLE_INDICATOR_ENABLED = "revivable_indicator_enabled",
 }
 
 export type CopyFormat = "name_id" | "rich";
@@ -173,6 +174,21 @@ export class Config {
   }
 
   /**
+   * Checks whether the revivable-plus indicator (the red/purple "+" over a
+   * member's status, per CONTEXT.md) is shown. Gates it uniformly across
+   * both sides of the war and all canonical states.
+   */
+  get revivable_indicator_enabled(): boolean {
+    return (
+      this.storage.get<boolean>(CONFIG_KEYS.REVIVABLE_INDICATOR_ENABLED) ?? true
+    );
+  }
+
+  set revivable_indicator_enabled(val: boolean) {
+    this.storage.set(CONFIG_KEYS.REVIVABLE_INDICATOR_ENABLED, val);
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
@@ -185,6 +201,7 @@ export class Config {
     this.storage.remove(CONFIG_KEYS.COPY_BUTTON_ENABLED);
     this.storage.remove(CONFIG_KEYS.COPY_FORMAT);
     this.storage.remove(CONFIG_KEYS.TWSE_SERVER_ENABLED);
+    this.storage.remove(CONFIG_KEYS.REVIVABLE_INDICATOR_ENABLED);
   }
 }
 

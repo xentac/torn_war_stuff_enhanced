@@ -147,6 +147,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           "twse-bubble-disabled",
           !twseconfig.bubble_enabled,
         );
+        document.body.classList.toggle(
+          "twse-revivable-disabled",
+          !twseconfig.revivable_indicator_enabled,
+        );
       };
 
       // Synchronize initial configuration classes

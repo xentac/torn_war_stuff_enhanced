@@ -9,6 +9,7 @@ const DEFAULT_VALUES = {
   copyButtonEnabled: true,
   copyFormat: "name_id" as CopyFormat,
   twseServerEnabled: true,
+  revivableIndicatorEnabled: true,
   debugLogs: false,
   debugForceReactFallback: false,
 };
@@ -24,6 +25,7 @@ type SettingsPanelComponentProps = {
   onCopyButtonEnabledDraftChange: (val: boolean) => void;
   onCopyFormatDraftChange: (val: CopyFormat) => void;
   onTwseServerEnabledDraftChange: (val: boolean) => void;
+  onRevivableIndicatorEnabledDraftChange: (val: boolean) => void;
   onDebugLogsDraftChange: (val: boolean) => void;
   onDebugForceReactFallbackDraftChange: (val: boolean) => void;
   onSave: () => void;
@@ -43,6 +45,7 @@ export function SettingsPanelComponent({
   onCopyButtonEnabledDraftChange,
   onCopyFormatDraftChange,
   onTwseServerEnabledDraftChange,
+  onRevivableIndicatorEnabledDraftChange,
   onDebugLogsDraftChange,
   onDebugForceReactFallbackDraftChange,
   onSave,
@@ -155,6 +158,23 @@ export function SettingsPanelComponent({
               Name [ID] - Stat estimate - Attack link
             </option>
           </select>
+        </div>
+
+        {/* Revivable-plus indicator toggle */}
+        <div className="input-row-inline">
+          <input
+            id="twse-revivable-indicator-toggle"
+            type="checkbox"
+            checked={drafts.revivableIndicatorEnabled}
+            onChange={(e) =>
+              onRevivableIndicatorEnabledDraftChange(
+                (e.target as HTMLInputElement).checked,
+              )
+            }
+          />
+          <label htmlFor="twse-revivable-indicator-toggle">
+            Show revivable-plus indicator (red/purple + over status)
+          </label>
         </div>
 
         {/* Community Data Sharing */}
@@ -298,6 +318,7 @@ export class TWSESettingsPanel extends HTMLElement {
       copyButtonEnabled: this._props.copyButtonEnabled,
       copyFormat: this._props.copyFormat,
       twseServerEnabled: this._props.twseServerEnabled,
+      revivableIndicatorEnabled: this._props.revivableIndicatorEnabled,
       debugLogs: this._props.debugLogs,
       debugForceReactFallback: this._props.debugForceReactFallback,
     };
@@ -354,6 +375,11 @@ export class TWSESettingsPanel extends HTMLElement {
         },
         onTwseServerEnabledDraftChange: (val) => {
           this._drafts.twseServerEnabled = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onRevivableIndicatorEnabledDraftChange: (val) => {
+          this._drafts.revivableIndicatorEnabled = val;
           this._showSavedMessage = false;
           this.render();
         },
@@ -423,6 +449,7 @@ export class TWSESettingsPanel extends HTMLElement {
           copyButtonEnabled: this._drafts.copyButtonEnabled,
           copyFormat: this._drafts.copyFormat,
           twseServerEnabled: this._drafts.twseServerEnabled,
+          revivableIndicatorEnabled: this._drafts.revivableIndicatorEnabled,
           debugLogs: this._drafts.debugLogs,
           debugForceReactFallback: this._drafts.debugForceReactFallback,
         },
@@ -484,6 +511,15 @@ export class TWSESettingsPanel extends HTMLElement {
   set twseServerEnabled(val: boolean) {
     this._props.twseServerEnabled = val;
     this._drafts.twseServerEnabled = val;
+    this.render();
+  }
+
+  get revivableIndicatorEnabled() {
+    return this._props.revivableIndicatorEnabled;
+  }
+  set revivableIndicatorEnabled(val: boolean) {
+    this._props.revivableIndicatorEnabled = val;
+    this._drafts.revivableIndicatorEnabled = val;
     this.render();
   }
 
@@ -551,6 +587,14 @@ export class TWSESettingsPanel extends HTMLElement {
   }
   set draftTwseServerEnabled(val: boolean) {
     this._drafts.twseServerEnabled = val;
+    this.render();
+  }
+
+  get draftRevivableIndicatorEnabled() {
+    return this._drafts.revivableIndicatorEnabled;
+  }
+  set draftRevivableIndicatorEnabled(val: boolean) {
+    this._drafts.revivableIndicatorEnabled = val;
     this.render();
   }
 
