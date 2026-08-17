@@ -36,11 +36,14 @@ import {
   parseCanonicalStatus,
   SortGroup,
 } from "./classify-member";
+import type { PresenceCounts } from "./torn-war-page";
 import {
   getFactionIds,
+  getFactionMemberLists,
   getMemberLists,
   getMemberRows,
   getSortedColumn,
+  parsePresence,
 } from "./torn-war-page";
 
 const log = logger.child("feature:war-monitor");
@@ -48,6 +51,8 @@ const log = logger.child("feature:war-monitor");
 interface MemberLiRef {
   li: HTMLLIElement;
   statusDiv: HTMLDivElement | null;
+  /** Null when the row's own list has no resolvable faction id (rare — see getFactionMemberLists); such rows are simply excluded from presence tallies. */
+  factionId: string | null;
 }
 
 interface ActiveChainState {
@@ -195,6 +200,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         WarMonitorFeature.intervals.minTimeBetweenRequests;
 
       const activeChains = new Map<string, ActiveChainState>();
+      // Presence (CONTEXT.md) tallies per faction, rebuilt each watch() tick
+      // as a side effect of the per-member walk that function already does —
+      // read here by updateChainBubble rather than re-querying the DOM.
+      let presenceCounts = new Map<string, PresenceCounts>();
       const lastAppliedTimestamp = new Map<FactionId, number>();
       let cachedUserIdHashKey: string | null = null;
       let cachedUserIdHash: string | null = null;
@@ -639,8 +648,16 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       // Extract faction member list details
       function extractAllMemberLis() {
         memberLis.clear();
+        // Resolved once per pass, not per row — see MemberRow.list.
+        const listFactionIds = new Map<Element, string>(
+          getFactionMemberLists().map((f) => [f.list, f.factionId]),
+        );
         for (const row of getMemberRows()) {
-          memberLis.set(row.id, { li: row.li, statusDiv: row.statusDiv });
+          memberLis.set(row.id, {
+            li: row.li,
+            statusDiv: row.statusDiv,
+            factionId: listFactionIds.get(row.list) ?? null,
+          });
           injectCopyButton(row.id, row.li);
         }
       }
@@ -1084,9 +1101,28 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       }
 
       function watch() {
+        const nextPresenceCounts = new Map<string, PresenceCounts>();
+
         memberLis.forEach((elem, id) => {
           const li = elem.li;
           const statusDiv = elem.statusDiv;
+
+          // Presence is independent of canonical status/API data (unlike
+          // everything below, which needs statusDiv/member), so tally it
+          // ahead of that guard — piggybacking on the walk this function
+          // already does over every row instead of a second DOM pass in
+          // updateChainBubble.
+          const presence = parsePresence(li);
+          if (presence && elem.factionId) {
+            const tally = nextPresenceCounts.get(elem.factionId) ?? {
+              online: 0,
+              idle: 0,
+              offline: 0,
+            };
+            tally[presence]++;
+            nextPresenceCounts.set(elem.factionId, tally);
+          }
+
           if (!li || !statusDiv) return;
 
           const member = members.get(id);
@@ -1195,7 +1231,19 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           }
         }
 
+        presenceCounts = nextPresenceCounts;
         updateChainBubble();
+      }
+
+      // Right-pads each presence count to a fixed 2-digit width with
+      // non-breaking spaces (not regular spaces, so HTML never collapses
+      // them) so the three online/idle/offline columns stay aligned in the
+      // monospace bubble as digit counts change tick to tick, instead of
+      // the row reflowing. null (no chain data yet for this faction) renders
+      // as "-", padded the same way.
+      function formatPresenceSlot(count: number | null): string {
+        const text = count === null ? "-" : String(count);
+        return text.padStart(2, " ");
       }
 
       function updateChainBubble() {
@@ -1215,7 +1263,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         // seconds; convert our ms clock here, at the comparison.
         const nowSec: TornTimestampSec = getCurrentTime() / 1000;
 
-        activeChains.forEach((chain) => {
+        activeChains.forEach((chain, factionId) => {
           let formattedTime = "";
           let timerClass = "okay";
           let countClass = "";
@@ -1248,12 +1296,22 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             }
           }
 
+          const presence = presenceCounts.get(factionId);
+          const presenceText = [
+            presence?.online ?? null,
+            presence?.idle ?? null,
+            presence?.offline ?? null,
+          ]
+            .map(formatPresenceSlot)
+            .join("/");
+
           html += `
             <div class="twse-chain-row">
               <div class="twse-chain-stats">
                 <span class="twse-chain-count ${countClass}">${chain.current}/${chain.max}</span>
                 <span class="twse-chain-mult">${chain.modifier.toFixed(2)}x</span>
                 <span class="twse-chain-timer ${timerClass}">${formattedTime}</span>
+                <span class="twse-chain-presence" title="Online/Idle/Offline">${presenceText}</span>
               </div>
             </div>
           `;

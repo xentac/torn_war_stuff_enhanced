@@ -2,6 +2,8 @@ export interface MemberRow {
   id: string;
   li: HTMLLIElement;
   statusDiv: HTMLDivElement | null;
+  /** The <ul> this row came from — pair with getFactionMemberLists() to resolve a faction id, if needed. */
+  list: Element;
 }
 
 export interface SortedColumn {
@@ -14,27 +16,81 @@ export function getMemberLists(): Element[] {
   return Array.from(document.querySelectorAll("ul.members-list"));
 }
 
+export interface FactionMemberList {
+  factionId: string;
+  list: Element;
+}
+
 /**
- * Faction id parsed from each member list's <a href="/factions.php?ID=...">.
- * Skips any list where that anchor is missing or unparseable.
+ * Pairs each member list with its faction id, parsed from that list's
+ * <a href="/factions.php?ID=...">. Skips any list where that anchor is
+ * missing or unparseable.
  */
-export function getFactionIds(): string[] {
-  const ids: string[] = [];
+export function getFactionMemberLists(): FactionMemberList[] {
+  const result: FactionMemberList[] = [];
   for (const list of getMemberLists()) {
     const anchor = list.querySelector<HTMLAnchorElement>(
       "a[href^='/factions.php']",
     );
     if (!anchor) continue;
     const id = parseHrefParam(anchor, "ID");
-    if (id) ids.push(id);
+    if (!id) continue;
+    result.push({ factionId: id, list });
   }
-  return ids;
+  return result;
+}
+
+/**
+ * Faction id parsed from each member list's <a href="/factions.php?ID=...">.
+ * Skips any list where that anchor is missing or unparseable.
+ */
+export function getFactionIds(): string[] {
+  return getFactionMemberLists().map((f) => f.factionId);
+}
+
+export type Presence = "online" | "idle" | "offline";
+
+const PRESENCE_SUFFIXES: [suffix: string, presence: Presence][] = [
+  [" is online", "online"],
+  [" is idle", "idle"],
+  [" is offline", "offline"],
+];
+
+/**
+ * A member row's online/idle/offline presence, read from the aria-label Torn
+ * writes on the row's status icon ("{name} is online|idle|offline") -
+ * independent of canonical status (CONTEXT.md "Presence"), sourced directly
+ * from the live DOM rather than the Torn API for freshness. Checks every
+ * aria-label-bearing descendant (not just the first) since the row also
+ * carries unrelated aria-labels (faction tag, profile link, honor badge).
+ * Returns null if no descendant's label matches the expected suffix.
+ */
+export function parsePresence(li: HTMLLIElement): Presence | null {
+  const labeled = li.querySelectorAll<HTMLElement>("[aria-label]");
+  for (const el of Array.from(labeled)) {
+    const label = el.getAttribute("aria-label");
+    if (!label) continue;
+    for (const [suffix, presence] of PRESENCE_SUFFIXES) {
+      if (label.endsWith(suffix)) return presence;
+    }
+  }
+  return null;
+}
+
+export interface PresenceCounts {
+  online: number;
+  idle: number;
+  offline: number;
 }
 
 /**
  * Every <li class="enemy"|"your"> row across every member list, with its
  * member id (parsed from <a href="/profiles.php?XID=...">) and status div.
- * Skips any row where the anchor is missing or the id is unparseable.
+ * Skips any row where the anchor is missing or the id is unparseable. Does
+ * NOT require the row's own list to have a resolvable faction id (unlike
+ * getFactionMemberLists) — this is the primary member-tracking extraction
+ * used for classification, sorting, etc., and should stay available even if
+ * a list's faction anchor is momentarily unparseable.
  */
 export function getMemberRows(): MemberRow[] {
   const rows: MemberRow[] = [];
@@ -51,6 +107,7 @@ export function getMemberRows(): MemberRow[] {
         id,
         li,
         statusDiv: li.querySelector<HTMLDivElement>("div.status"),
+        list,
       });
     }
   }

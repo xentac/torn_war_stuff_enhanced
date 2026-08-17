@@ -207,6 +207,8 @@ class MockElement {
         (el.className.includes("enemy") || el.className.includes("your"))
       )
         return true;
+      if (selector === "[aria-label]" && el.getAttribute("aria-label") !== null)
+        return true;
       return false;
     }, res);
     return res;
@@ -860,6 +862,30 @@ describe("WarMonitorFeature Sorting Config", () => {
     atag.setAttribute("href", "/factions.php?ID=999");
     ul.appendChild(atag);
 
+    // Presence rows: two online, one idle, one offline, one unparseable.
+    // Each needs a profile anchor (like every real member row) so it's
+    // picked up into memberLis, which is what watch() actually walks.
+    const presenceLabels = [
+      "A is online",
+      "B is online",
+      "C is idle",
+      "D is offline",
+      null,
+    ];
+    presenceLabels.forEach((label, i) => {
+      const li = new MockElement("li");
+      li.className = "enemy";
+      const profileAnchor = new MockElement("a");
+      profileAnchor.setAttribute("href", `/profiles.php?XID=${9000 + i}`);
+      li.appendChild(profileAnchor);
+      if (label) {
+        const statusIcon = new MockElement("div");
+        statusIcon.setAttribute("aria-label", label);
+        li.appendChild(statusIcon);
+      }
+      ul.appendChild(li);
+    });
+
     descriptions.appendChild(ul);
     factionWarList.appendChild(descriptions);
     documentMock.body.appendChild(factionWarList);
@@ -891,6 +917,10 @@ describe("WarMonitorFeature Sorting Config", () => {
     expect(bubble.innerHTML).toContain("1.50x");
     expect(bubble.innerHTML).toMatch(/1:59|2:00/);
     expect(bubble.className).not.toContain("hidden");
+    // Presence counts (online/idle/offline): 2 online, 1 idle, 1 offline,
+    // the unparseable 5th row excluded from all three. Each count is padded
+    // to 2 digits with a non-breaking space so the columns stay aligned.
+    expect(bubble.innerHTML).toContain(" 2/ 1/ 1");
 
     // Test negative countdown scenario (expired chain before next poll)
     mockChainData.timeout = 2;

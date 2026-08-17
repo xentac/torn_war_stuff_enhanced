@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   getFactionIds,
+  getFactionMemberLists,
   getMemberLists,
   getMemberRows,
   getSortedColumn,
+  parsePresence,
 } from "./torn-war-page";
 
 // Minimal fake DOM tree — just enough to support the specific selector
@@ -48,6 +50,12 @@ class FakeElement {
         this.tagName === tag.toUpperCase() &&
         (this.getAttribute(attr) ?? "").startsWith(prefix)
       );
+    }
+    // [attr] (attribute exists, any tag)
+    const attrExistsMatch = selector.match(/^\[(\w[\w-]*)\]$/);
+    if (attrExistsMatch) {
+      const [, attr] = attrExistsMatch;
+      return this.getAttribute(attr) !== null;
     }
     // tag.class
     const tagClassMatch = selector.match(/^(\w+)\.([\w-]+)$/);
@@ -171,6 +179,12 @@ function memberRow(options: {
   return li;
 }
 
+function ariaLabelEl(label: string): FakeElement {
+  const el = new FakeElement("div");
+  el.setAttribute("aria-label", label);
+  return el;
+}
+
 afterEach(() => {
   // @ts-expect-error test-only global cleanup
   delete global.document;
@@ -219,7 +233,7 @@ describe("getFactionIds", () => {
 });
 
 describe("getMemberRows", () => {
-  it("extracts id (from XID), li, and statusDiv for each row, across lists", () => {
+  it("extracts id (from XID), li, statusDiv, and list for each row, across lists", () => {
     const ul1 = memberList();
     const row1 = memberRow({ href: "/profiles.php?XID=111" });
     ul1.appendChild(row1);
@@ -236,7 +250,9 @@ describe("getMemberRows", () => {
     expect(rows[0].id).toBe("111");
     expect(rows[0].li).toBe(row1);
     expect(rows[0].statusDiv).not.toBeNull();
+    expect(rows[0].list).toBe(ul1);
     expect(rows[1].id).toBe("222");
+    expect(rows[1].list).toBe(ul2);
   });
 
   it("includes li.your rows alongside li.enemy rows", () => {
@@ -275,6 +291,14 @@ describe("getMemberRows", () => {
     const rows = getMemberRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].statusDiv).toBeNull();
+  });
+
+  it("still includes rows even when the list's own faction anchor is missing (unlike getFactionMemberLists)", () => {
+    const ul = memberList();
+    ul.appendChild(memberRow({ href: "/profiles.php?XID=666" }));
+    global.document = fakeDocument([ul]) as unknown as Document;
+
+    expect(getMemberRows()).toHaveLength(1);
   });
 });
 
@@ -316,5 +340,75 @@ describe("getSortedColumn", () => {
       column: null,
       order: null,
     });
+  });
+});
+
+describe("getFactionMemberLists", () => {
+  it("pairs each list with its faction id", () => {
+    const ul1 = memberList();
+    ul1.appendChild(factionAnchor("/factions.php?ID=111"));
+    const ul2 = memberList();
+    ul2.appendChild(factionAnchor("/factions.php?ID=222"));
+    global.document = fakeDocument([ul1, ul2]) as unknown as Document;
+
+    expect(getFactionMemberLists()).toEqual([
+      { factionId: "111", list: ul1 },
+      { factionId: "222", list: ul2 },
+    ]);
+  });
+
+  it("skips a list whose faction anchor is missing, without misaligning the rest", () => {
+    const ul1 = memberList();
+    const ul2 = memberList();
+    ul2.appendChild(factionAnchor("/factions.php?ID=222"));
+    global.document = fakeDocument([ul1, ul2]) as unknown as Document;
+
+    expect(getFactionMemberLists()).toEqual([{ factionId: "222", list: ul2 }]);
+  });
+});
+
+describe("parsePresence", () => {
+  it("returns 'online' when a descendant's aria-label ends in ' is online'", () => {
+    const li = memberRow({ href: "/profiles.php?XID=1" });
+    li.appendChild(ariaLabelEl("Someone is online"));
+
+    expect(parsePresence(li as unknown as HTMLLIElement)).toBe("online");
+  });
+
+  it("returns 'idle' when a descendant's aria-label ends in ' is idle'", () => {
+    const li = memberRow({ href: "/profiles.php?XID=1" });
+    li.appendChild(ariaLabelEl("Someone is idle"));
+
+    expect(parsePresence(li as unknown as HTMLLIElement)).toBe("idle");
+  });
+
+  it("returns 'offline' when a descendant's aria-label ends in ' is offline'", () => {
+    const li = memberRow({ href: "/profiles.php?XID=1" });
+    li.appendChild(ariaLabelEl("Someone is offline"));
+
+    expect(parsePresence(li as unknown as HTMLLIElement)).toBe("offline");
+  });
+
+  it("skips unrelated aria-labels (faction tag, profile link, honor badge) to find the presence one", () => {
+    const li = memberRow({ href: "/profiles.php?XID=1" });
+    li.appendChild(ariaLabelEl("View faction VR"));
+    li.appendChild(ariaLabelEl("View profile of Someone"));
+    li.appendChild(ariaLabelEl("Premium data"));
+    li.appendChild(ariaLabelEl("Someone is idle"));
+
+    expect(parsePresence(li as unknown as HTMLLIElement)).toBe("idle");
+  });
+
+  it("returns null when no descendant's aria-label matches a presence suffix", () => {
+    const li = memberRow({ href: "/profiles.php?XID=1" });
+    li.appendChild(ariaLabelEl("View faction VR"));
+
+    expect(parsePresence(li as unknown as HTMLLIElement)).toBeNull();
+  });
+
+  it("returns null when the row has no aria-label descendants at all", () => {
+    const li = memberRow({ href: "/profiles.php?XID=1" });
+
+    expect(parsePresence(li as unknown as HTMLLIElement)).toBeNull();
   });
 });

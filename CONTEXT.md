@@ -33,6 +33,9 @@ _Avoid_: Revival, revivable, revive privacy, revive permission
 **Revivable-plus indicator**: The red/purple `"+"` drawn over a member's status cell (`data-twse-revivable`), driven directly by Revive setting — red for `Everyone`, purple for `Friends & faction`, absent for `No one`/`Unknown`/unknown. Shown in any canonical state, not just Hospital, on both sides of the war (own faction and enemy), though purple is only ever expected to actually appear on the operator's own faction's rows per the caller-relativity above.
 _Avoid_: Revival, revivable status
 
+**Presence**: A member's online/idle/offline indicator, read from the `aria-label` Torn writes on the member row's status icon (`"{name} is online|idle|offline"`) — sourced from the live DOM, like canonical status, rather than the Torn API, for freshness. Independent of canonical status: a hospitalized member can still be online.
+_Avoid_: online status (ambiguous with canonical "Okay"), activity state
+
 ### Sort model
 
 **Sort group**: The category that places a member's row ahead of or behind other rows in the member list, before any within-group tie-break is applied. The member list orders by sort group first: unexpected transitions, then Tier B, then hospitalized/jailed, then the incoming/abroad/outgoing/traveling sub-groups. Tier A and Tier B are the two sort groups used within the Okay section; the remaining sort groups order non-Okay states.
