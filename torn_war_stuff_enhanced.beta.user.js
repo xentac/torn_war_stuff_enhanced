@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.1
+// @version      2.2-beta1
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -308,6 +308,14 @@ get copy_button_enabled() {
     set copy_button_enabled(val) {
       this.storage.set("copy_button_enabled", val);
     }
+get copy_format() {
+      return this.storage.get(
+        "copy_format"
+) ?? "name_id";
+    }
+    set copy_format(val) {
+      this.storage.set("copy_format", val);
+    }
 reset() {
       this.storage.remove(
         "debug_logs"
@@ -329,6 +337,9 @@ reset() {
 );
       this.storage.remove(
         "copy_button_enabled"
+);
+      this.storage.remove(
+        "copy_format"
 );
     }
   }
@@ -528,6 +539,7 @@ reset() {
     warSorting: true,
     bubbleEnabled: true,
     copyButtonEnabled: true,
+    copyFormat: "name_id",
     debugLogs: false,
     debugForceReactFallback: false
   };
@@ -540,6 +552,7 @@ reset() {
     onWarSortingDraftChange,
     onBubbleEnabledDraftChange,
     onCopyButtonEnabledDraftChange,
+    onCopyFormatDraftChange,
     onDebugLogsDraftChange,
     onDebugForceReactFallbackDraftChange,
     onSave,
@@ -616,7 +629,24 @@ jsx(
               )
             }
           ),
-jsx("label", { htmlFor: "twse-copy-btn-toggle", children: 'Enable "Copy Name [ID]" Button next to members' })
+jsx("label", { htmlFor: "twse-copy-btn-toggle", children: "Enable copy button next to members" })
+        ] }),
+jsxs("div", { className: "input-row-inline", children: [
+jsx("label", { htmlFor: "twse-copy-format", children: "Copy format:" }),
+jsxs(
+            "select",
+            {
+              id: "twse-copy-format",
+              value: drafts.copyFormat,
+              onChange: (e) => onCopyFormatDraftChange(
+                e.target.value
+              ),
+              children: [
+jsx("option", { value: "name_id", children: "Name [ID]" }),
+jsx("option", { value: "rich", children: "Name [ID] - Stat estimate - Attack link" })
+              ]
+            }
+          )
         ] }),
 jsxs("div", { className: "input-row-inline", children: [
 jsx(
@@ -720,6 +750,7 @@ jsx(
         warSorting: this._props.warSorting,
         bubbleEnabled: this._props.bubbleEnabled,
         copyButtonEnabled: this._props.copyButtonEnabled,
+        copyFormat: this._props.copyFormat,
         debugLogs: this._props.debugLogs,
         debugForceReactFallback: this._props.debugForceReactFallback
       };
@@ -763,6 +794,11 @@ jsx(
           },
           onCopyButtonEnabledDraftChange: (val) => {
             this._drafts.copyButtonEnabled = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onCopyFormatDraftChange: (val) => {
+            this._drafts.copyFormat = val;
             this._showSavedMessage = false;
             this.render();
           },
@@ -824,6 +860,7 @@ jsx(
             warSorting: this._drafts.warSorting,
             bubbleEnabled: this._drafts.bubbleEnabled,
             copyButtonEnabled: this._drafts.copyButtonEnabled,
+            copyFormat: this._drafts.copyFormat,
             debugLogs: this._drafts.debugLogs,
             debugForceReactFallback: this._drafts.debugForceReactFallback
           },
@@ -862,6 +899,14 @@ get apiKey() {
     set copyButtonEnabled(val) {
       this._props.copyButtonEnabled = val;
       this._drafts.copyButtonEnabled = val;
+      this.render();
+    }
+    get copyFormat() {
+      return this._props.copyFormat;
+    }
+    set copyFormat(val) {
+      this._props.copyFormat = val;
+      this._drafts.copyFormat = val;
       this.render();
     }
     get debugLogs() {
@@ -908,6 +953,13 @@ get draftApiKey() {
       this._drafts.copyButtonEnabled = val;
       this.render();
     }
+    get draftCopyFormat() {
+      return this._drafts.copyFormat;
+    }
+    set draftCopyFormat(val) {
+      this._drafts.copyFormat = val;
+      this.render();
+    }
     get draftDebugLogs() {
       return this._drafts.debugLogs;
     }
@@ -945,6 +997,7 @@ get draftApiKey() {
       panel.warSorting = twseconfig.war_sorting;
       panel.bubbleEnabled = twseconfig.bubble_enabled;
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
+      panel.copyFormat = twseconfig.copy_format;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
       panel.addEventListener("twse-save", (e) => {
@@ -953,6 +1006,7 @@ get draftApiKey() {
         twseconfig.war_sorting = detail.warSorting;
         twseconfig.bubble_enabled = detail.bubbleEnabled;
         twseconfig.copy_button_enabled = detail.copyButtonEnabled;
+        twseconfig.copy_format = detail.copyFormat;
         twseconfig.debug_logs = detail.debugLogs;
         twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
         log$5.info("Settings saved successfully");
@@ -964,6 +1018,7 @@ get draftApiKey() {
         panel.warSorting = twseconfig.war_sorting;
         panel.bubbleEnabled = twseconfig.bubble_enabled;
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
+        panel.copyFormat = twseconfig.copy_format;
         panel.debugLogs = twseconfig.debug_logs;
         panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
         log$5.info("Settings reset to defaults");
@@ -1234,6 +1289,27 @@ clearAll() {
     }
   }
   const factionCache = new FactionCache();
+  const SUFFIXES = [
+    [1e12, "t"],
+    [1e9, "b"],
+    [1e6, "m"],
+    [1e3, "k"]
+  ];
+  function formatStatEstimate(value) {
+    for (let i = 0; i < SUFFIXES.length; i++) {
+      const [threshold, suffix] = SUFFIXES[i];
+      if (value >= threshold) {
+        const scaled = Number((value / threshold).toPrecision(3));
+        if (scaled >= 1e3 && i > 0) {
+          const [nextThreshold, nextSuffix] = SUFFIXES[i - 1];
+          const rescaled = Number((value / nextThreshold).toPrecision(3));
+          return `${rescaled}${nextSuffix}`;
+        }
+        return `${scaled}${suffix}`;
+      }
+    }
+    return `${Math.round(value)}`;
+  }
   function getCurrentTime() {
     const w = window;
     if (typeof w.getCurrentTimestamp === "function") {
@@ -1363,7 +1439,7 @@ submit(factionId, payload) {
     }
   }
   const twseClient = new TwseServerClient();
-  const stylesCss = ".members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}";
+  const stylesCss = '.members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}.members-list div.status[data-twse-revivable=everyone],.members-list div.status[data-twse-revivable=friends-faction]{position:relative!important}.members-list div.status[data-twse-revivable=everyone]:before,.members-list div.status[data-twse-revivable=friends-faction]:before{content:"+";position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:800;line-height:1}.members-list div.status[data-twse-revivable=everyone]:before{color:#ef4444!important}.members-list div.status[data-twse-revivable=friends-faction]:before{color:#a06bf0!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}.twse-chain-presence{font-family:monospace;color:#bbb}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}';
   importCSS(stylesCss);
   var SortGroup = ((SortGroup2) => {
     SortGroup2["UnexpectedOkay"] = "UnexpectedOkay";
@@ -1529,17 +1605,37 @@ submit(factionId, payload) {
   function getMemberLists() {
     return Array.from(document.querySelectorAll("ul.members-list"));
   }
-  function getFactionIds() {
-    const ids = [];
+  function getFactionMemberLists() {
+    const result = [];
     for (const list of getMemberLists()) {
       const anchor = list.querySelector(
         "a[href^='/factions.php']"
       );
       if (!anchor) continue;
       const id = parseHrefParam(anchor, "ID");
-      if (id) ids.push(id);
+      if (!id) continue;
+      result.push({ factionId: id, list });
     }
-    return ids;
+    return result;
+  }
+  function getFactionIds() {
+    return getFactionMemberLists().map((f) => f.factionId);
+  }
+  const PRESENCE_SUFFIXES = [
+    [" is online", "online"],
+    [" is idle", "idle"],
+    [" is offline", "offline"]
+  ];
+  function parsePresence(li) {
+    const labeled = li.querySelectorAll("[aria-label]");
+    for (const el of Array.from(labeled)) {
+      const label = el.getAttribute("aria-label");
+      if (!label) continue;
+      for (const [suffix, presence] of PRESENCE_SUFFIXES) {
+        if (label.endsWith(suffix)) return presence;
+      }
+    }
+    return null;
   }
   function getMemberRows() {
     const rows = [];
@@ -1555,7 +1651,8 @@ submit(factionId, payload) {
         rows.push({
           id,
           li,
-          statusDiv: li.querySelector("div.status")
+          statusDiv: li.querySelector("div.status"),
+          list
         });
       }
     }
@@ -1599,6 +1696,7 @@ submit(factionId, payload) {
   const TRAVELING = "data-twse-traveling";
   const HIGHLIGHT = "data-twse-highlight";
   const STATUS_DIFFERS = "data-twse-status-differs";
+  const REVIVABLE = "data-twse-revivable";
   function shouldRunMonitor() {
     if (!window.location.href.includes("factions.php")) {
       return false;
@@ -1681,6 +1779,7 @@ submit(factionId, payload) {
         let lastRequestTime = 0;
         const minTimeBetweenRequestsMs = WarMonitorFeature.intervals.minTimeBetweenRequests;
         const activeChains = new Map();
+        let presenceCounts = new Map();
         const lastAppliedTimestamp = new Map();
         let cachedUserIdHashKey = null;
         let cachedUserIdHash = null;
@@ -1869,7 +1968,25 @@ submit(factionId, payload) {
           window.addEventListener("focus", onWindowFocus);
           window.addEventListener("blur", onWindowBlur);
         }
-        async function copyToClipboard(text) {
+        async function copyToClipboard(content) {
+          const text = typeof content === "string" ? content : content.html;
+          if (typeof content !== "string") {
+            try {
+              if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+                await navigator.clipboard.write([
+                  new ClipboardItem({
+                    "text/html": new Blob([content.html], {
+                      type: "text/html"
+                    }),
+                    "text/plain": new Blob([text], { type: "text/plain" })
+                  })
+                ]);
+                return true;
+              }
+            } catch (err) {
+              log$1.error("Failed to copy rich content using clipboard.write", err);
+            }
+          }
           if (typeof window !== "undefined" && window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === "function") {
             try {
               await window.flutter_inappwebview.callHandler(
@@ -1904,6 +2021,15 @@ submit(factionId, payload) {
             return false;
           }
         }
+        function buildRichCopyContent(name, id, li) {
+          const profileUrl = `https://www.torn.com/profiles.php?XID=${id}`;
+          const attackUrl = `https://www.torn.com/page.php?sid=attack&user2ID=${id}`;
+          const rawEstimate = Number(li?.getAttribute("data-est-value"));
+          const estimate = Number.isFinite(rawEstimate) && rawEstimate > 0 ? formatStatEstimate(rawEstimate) : null;
+          const middle = estimate ? ` - ${estimate}` : "";
+          const html = `<a href="${profileUrl}">${name} [${id}]</a>${middle} - <a href="${attackUrl.replace(/&/g, "&amp;")}">Attack</a>`;
+          return { html };
+        }
         function injectCopyButton(id, li) {
           if (li.querySelector(".twse-copy-btn")) return;
           const atag = li.querySelector(
@@ -1915,7 +2041,7 @@ submit(factionId, payload) {
           const copyBtn = document.createElement("button");
           copyBtn.className = "twse-copy-btn";
           copyBtn.type = "button";
-          copyBtn.title = "Copy Name [ID]";
+          copyBtn.title = "Copy player info";
           copyBtn.setAttribute("data-player-id", id);
           copyBtn.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="twse-copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -1936,8 +2062,8 @@ submit(factionId, payload) {
           );
           const ariaMatch = atag?.getAttribute("aria-label")?.match(/^View profile of (.+)$/);
           const name = ariaMatch ? ariaMatch[1].trim() : atag?.textContent?.trim() || "";
-          const copyText = `${name} [${id}]`;
-          const success = await copyToClipboard(copyText);
+          const content = twseconfig.copy_format === "rich" ? buildRichCopyContent(name, id, li) : `${name} [${id}]`;
+          const success = await copyToClipboard(content);
           if (success) {
             copyBtn.classList.add("success");
             copyBtn.innerHTML = `
@@ -1953,8 +2079,15 @@ submit(factionId, payload) {
         }
         function extractAllMemberLis() {
           memberLis.clear();
+          const listFactionIds = new Map(
+            getFactionMemberLists().map((f) => [f.list, f.factionId])
+          );
           for (const row of getMemberRows()) {
-            memberLis.set(row.id, { li: row.li, statusDiv: row.statusDiv });
+            memberLis.set(row.id, {
+              li: row.li,
+              statusDiv: row.statusDiv,
+              factionId: listFactionIds.get(row.list) ?? null
+            });
             injectCopyButton(row.id, row.li);
           }
         }
@@ -2088,7 +2221,7 @@ submit(factionId, payload) {
           cachedUserIdHash = hash;
           return hash;
         }
-        function applyFactionData(factionId, data) {
+        function applyFactionData(factionId, data, source) {
           if (data.timestamp !== void 0) {
             const last = lastAppliedTimestamp.get(factionId) ?? 0;
             if (data.timestamp <= last) return;
@@ -2100,6 +2233,11 @@ submit(factionId, payload) {
             for (const memberData of data.members) {
               const id = String(memberData.id);
               memberData.status.last_req_time = reqTime;
+              if (source === "community") {
+                const existing = members.get(id);
+                memberData.revive_setting = existing?.revive_setting;
+                memberData.is_revivable = existing?.is_revivable;
+              }
               members.set(id, memberData);
               factionMembers[id] = memberData;
             }
@@ -2139,7 +2277,7 @@ submit(factionId, payload) {
               }
               continue;
             }
-            applyFactionData(factionId, data);
+            applyFactionData(factionId, data, "own");
             if (userIdHash !== null) {
               twseClient.submit(factionId, {
                 user_id_hash: userIdHash,
@@ -2157,7 +2295,15 @@ submit(factionId, payload) {
           [SortGroup.Outgoing]: "5",
           [SortGroup.Traveling]: "6"
         };
-        function applyClassification(li, statusDiv, status, classification, tornNow) {
+        function revivableIndicatorValue(member) {
+          if (member.revive_setting === "Everyone") return "everyone";
+          if (member.revive_setting === "Friends & faction")
+            return "friends-faction";
+          if (member.is_revivable) return "everyone";
+          return "false";
+        }
+        function applyClassification(li, statusDiv, member, classification, tornNow) {
+          const status = member.status;
           domWriter.setAttr(
             li,
             "data-sortA",
@@ -2261,11 +2407,27 @@ submit(factionId, payload) {
             "data-twse-overridden",
             overridden ? "true" : "false"
           );
+          domWriter.setAttr(
+            statusDiv,
+            REVIVABLE,
+            revivableIndicatorValue(member)
+          );
         }
         function watch() {
+          const nextPresenceCounts = new Map();
           memberLis.forEach((elem, id) => {
             const li = elem.li;
             const statusDiv = elem.statusDiv;
+            const presence = parsePresence(li);
+            if (presence && elem.factionId) {
+              const tally = nextPresenceCounts.get(elem.factionId) ?? {
+                online: 0,
+                idle: 0,
+                offline: 0
+              };
+              tally[presence]++;
+              nextPresenceCounts.set(elem.factionId, tally);
+            }
             if (!li || !statusDiv) return;
             const member = members.get(id);
             if (!member || !running) {
@@ -2315,7 +2477,7 @@ submit(factionId, payload) {
                 classification.nextTransitionState.okaySince
               );
             }
-            applyClassification(li, statusDiv, status, classification, tornNow);
+            applyClassification(li, statusDiv, member, classification, tornNow);
           });
           const dirtyGroups = domWriter.flush();
           if (twseconfig.war_sorting && (dirtyGroups.has("sort") || forceSortNextTick)) {
@@ -2346,7 +2508,12 @@ submit(factionId, payload) {
               memberLis.delete(id);
             }
           }
+          presenceCounts = nextPresenceCounts;
           updateChainBubble();
+        }
+        function formatPresenceSlot(count) {
+          const text = count === null ? "-" : String(count);
+          return text.padStart(2, " ");
         }
         function updateChainBubble() {
           if (!bubbleContainer || isDragging) return;
@@ -2359,7 +2526,7 @@ submit(factionId, payload) {
           if (!bodyContainer) return;
           let html = "";
           const nowSec = getCurrentTime() / 1e3;
-          activeChains.forEach((chain) => {
+          activeChains.forEach((chain, factionId) => {
             let formattedTime = "";
             let timerClass = "okay";
             let countClass = "";
@@ -2386,12 +2553,19 @@ submit(factionId, payload) {
                 formattedTime = formatChainTimeout(remaining);
               }
             }
+            const presence = presenceCounts.get(factionId);
+            const presenceText = [
+              presence?.online ?? null,
+              presence?.idle ?? null,
+              presence?.offline ?? null
+            ].map(formatPresenceSlot).join("/");
             html += `
             <div class="twse-chain-row">
               <div class="twse-chain-stats">
                 <span class="twse-chain-count ${countClass}">${chain.current}/${chain.max}</span>
                 <span class="twse-chain-mult">${chain.modifier.toFixed(2)}x</span>
                 <span class="twse-chain-timer ${timerClass}">${formattedTime}</span>
+                <span class="twse-chain-presence" title="Online/Idle/Offline">${presenceText}</span>
               </div>
             </div>
           `;
@@ -2528,7 +2702,7 @@ submit(factionId, payload) {
             if (!running || !foundWar) return;
             for (const factionId of getFactionIds()) {
               const data = await twseClient.fetchLatest(factionId);
-              if (data) applyFactionData(factionId, data);
+              if (data) applyFactionData(factionId, data, "community");
             }
           } finally {
             if (!cacheTimer) {

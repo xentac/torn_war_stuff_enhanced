@@ -8,7 +8,7 @@ This version is a nearly entirely rewritten version with many new features along
 - Sorts faction members by Okay/Hospital/Departing/Abroad/Returning
 - Members who land or med/revive early are sorted to the top of the Okay section and highlighted (if window focused)
 - Chain count and timers always on screen
-- Quick copy `Name [ID]` of a player by clicking on the right side of their honor bar
+- Quick copy a player's info (`Name [ID]`) by clicking on the right side of their honor bar — optionally as a rich format with linked name, stat estimate, and attack link in settings
 - Optional Torn API status sharing (via the TWSE Server) to ensure up-to-date timers
 - Tuned for efficiency: the most features and lowest performance impact of any war monitoring script!
 
