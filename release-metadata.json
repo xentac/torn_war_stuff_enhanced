@@ -1,7 +1,7 @@
 {
   "edition": "beta",
-  "version": "2.2-beta1",
-  "buildDate": "2026-08-17T02:29:56.494Z",
-  "sourceCommit": "734cf723ca7e5de34695e6d67c4344dcf53fac3c",
+  "version": "2.2-beta2",
+  "buildDate": "2026-08-17T03:44:43.743Z",
+  "sourceCommit": "9258c7e9dbf9cefccc5794612db82eba9f3dd806",
   "sourceBranch": "DETACHED_HEAD"
 }

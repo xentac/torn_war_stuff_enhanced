@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.2-beta1
+// @version      2.2-beta2
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -316,6 +316,14 @@ get copy_format() {
     set copy_format(val) {
       this.storage.set("copy_format", val);
     }
+get twse_server_enabled() {
+      return this.storage.get(
+        "twse_server_enabled"
+) ?? true;
+    }
+    set twse_server_enabled(val) {
+      this.storage.set("twse_server_enabled", val);
+    }
 reset() {
       this.storage.remove(
         "debug_logs"
@@ -340,6 +348,9 @@ reset() {
 );
       this.storage.remove(
         "copy_format"
+);
+      this.storage.remove(
+        "twse_server_enabled"
 );
     }
   }
@@ -540,6 +551,7 @@ reset() {
     bubbleEnabled: true,
     copyButtonEnabled: true,
     copyFormat: "name_id",
+    twseServerEnabled: true,
     debugLogs: false,
     debugForceReactFallback: false
   };
@@ -553,6 +565,7 @@ reset() {
     onBubbleEnabledDraftChange,
     onCopyButtonEnabledDraftChange,
     onCopyFormatDraftChange,
+    onTwseServerEnabledDraftChange,
     onDebugLogsDraftChange,
     onDebugForceReactFallbackDraftChange,
     onSave,
@@ -647,6 +660,25 @@ jsx("option", { value: "rich", children: "Name [ID] - Stat estimate - Attack lin
               ]
             }
           )
+        ] }),
+jsx("h3", { children: "Community Data Sharing:" }),
+jsxs("div", { className: "input-row-inline", children: [
+jsx(
+            "input",
+            {
+              id: "twse-server-enabled",
+              type: "checkbox",
+              checked: drafts.twseServerEnabled,
+              onChange: (e) => onTwseServerEnabledDraftChange(
+                e.target.checked
+              )
+            }
+          ),
+jsx("label", { htmlFor: "twse-server-enabled", children: "Share and receive faction status updates via the TWSE Server" }),
+jsxs("div", { className: "twse-api-explanation", children: [
+jsx("strong", { children: "Info:" }),
+            " When enabled, this script shares your faction's status data (member statuses, hospital timers, chain state) with the TWSE Server, tagged with a hashed (not reversible) copy of your API key — and in turn receives fresher updates contributed by other users' scripts in the gaps between your own 10-second polls. Disabling this stops both: nothing is sent, and no community updates are received."
+          ] })
         ] }),
 jsxs("div", { className: "input-row-inline", children: [
 jsx(
@@ -751,6 +783,7 @@ jsx(
         bubbleEnabled: this._props.bubbleEnabled,
         copyButtonEnabled: this._props.copyButtonEnabled,
         copyFormat: this._props.copyFormat,
+        twseServerEnabled: this._props.twseServerEnabled,
         debugLogs: this._props.debugLogs,
         debugForceReactFallback: this._props.debugForceReactFallback
       };
@@ -799,6 +832,11 @@ jsx(
           },
           onCopyFormatDraftChange: (val) => {
             this._drafts.copyFormat = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onTwseServerEnabledDraftChange: (val) => {
+            this._drafts.twseServerEnabled = val;
             this._showSavedMessage = false;
             this.render();
           },
@@ -861,6 +899,7 @@ jsx(
             bubbleEnabled: this._drafts.bubbleEnabled,
             copyButtonEnabled: this._drafts.copyButtonEnabled,
             copyFormat: this._drafts.copyFormat,
+            twseServerEnabled: this._drafts.twseServerEnabled,
             debugLogs: this._drafts.debugLogs,
             debugForceReactFallback: this._drafts.debugForceReactFallback
           },
@@ -907,6 +946,14 @@ get apiKey() {
     set copyFormat(val) {
       this._props.copyFormat = val;
       this._drafts.copyFormat = val;
+      this.render();
+    }
+    get twseServerEnabled() {
+      return this._props.twseServerEnabled;
+    }
+    set twseServerEnabled(val) {
+      this._props.twseServerEnabled = val;
+      this._drafts.twseServerEnabled = val;
       this.render();
     }
     get debugLogs() {
@@ -960,6 +1007,13 @@ get draftApiKey() {
       this._drafts.copyFormat = val;
       this.render();
     }
+    get draftTwseServerEnabled() {
+      return this._drafts.twseServerEnabled;
+    }
+    set draftTwseServerEnabled(val) {
+      this._drafts.twseServerEnabled = val;
+      this.render();
+    }
     get draftDebugLogs() {
       return this._drafts.debugLogs;
     }
@@ -998,6 +1052,7 @@ get draftApiKey() {
       panel.bubbleEnabled = twseconfig.bubble_enabled;
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
       panel.copyFormat = twseconfig.copy_format;
+      panel.twseServerEnabled = twseconfig.twse_server_enabled;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
       panel.addEventListener("twse-save", (e) => {
@@ -1007,6 +1062,7 @@ get draftApiKey() {
         twseconfig.bubble_enabled = detail.bubbleEnabled;
         twseconfig.copy_button_enabled = detail.copyButtonEnabled;
         twseconfig.copy_format = detail.copyFormat;
+        twseconfig.twse_server_enabled = detail.twseServerEnabled;
         twseconfig.debug_logs = detail.debugLogs;
         twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
         log$5.info("Settings saved successfully");
@@ -1019,6 +1075,7 @@ get draftApiKey() {
         panel.bubbleEnabled = twseconfig.bubble_enabled;
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
         panel.copyFormat = twseconfig.copy_format;
+        panel.twseServerEnabled = twseconfig.twse_server_enabled;
         panel.debugLogs = twseconfig.debug_logs;
         panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
         log$5.info("Settings reset to defaults");
@@ -1074,7 +1131,7 @@ async fetchFactionData(factionId) {
         log$4.warn("Torn API key is invalid or not set. Skipping API request.");
         return null;
       }
-      const url = `${this.baseUrl}?id=${factionId}&selections=members,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced&timestamp=${Date.now() % 1e3 + 10}`;
+      const url = `${this.baseUrl}?id=${factionId}&selections=members,wars,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced&timestamp=${Date.now() % 1e3 + 10}`;
       try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -2278,7 +2335,7 @@ submit(factionId, payload) {
               continue;
             }
             applyFactionData(factionId, data, "own");
-            if (userIdHash !== null) {
+            if (userIdHash !== null && twseconfig.twse_server_enabled) {
               twseClient.submit(factionId, {
                 user_id_hash: userIdHash,
                 torn_response: data
@@ -2699,7 +2756,7 @@ submit(factionId, payload) {
           }
           cacheTimer = null;
           try {
-            if (!running || !foundWar) return;
+            if (!running || !foundWar || !twseconfig.twse_server_enabled) return;
             for (const factionId of getFactionIds()) {
               const data = await twseClient.fetchLatest(factionId);
               if (data) applyFactionData(factionId, data, "community");
