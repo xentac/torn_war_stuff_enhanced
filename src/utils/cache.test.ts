@@ -36,6 +36,7 @@ describe("FactionCache", () => {
         description: "Okay",
         until: 0,
       },
+      revive_setting: "Unknown",
     },
   };
 

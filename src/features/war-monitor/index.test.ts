@@ -1480,6 +1480,7 @@ describe("WarMonitorFeature Sorting Config", () => {
               description: "In the hospital",
               until: futureUntil,
             },
+            revive_setting: "Unknown",
           },
         ],
       });
@@ -1511,6 +1512,236 @@ describe("WarMonitorFeature Sorting Config", () => {
       spy.mockRestore();
     });
 
+    it("should set data-twse-revivable from revive_setting, or is_revivable as a fallback, independent of state", async () => {
+      const { tornApi } = await import("@utils/api");
+      const futureUntil = Math.floor(Date.now() / 1000) + 300;
+
+      buildWarDOM([
+        { id: "40", statusClass: "ok", statusText: "Okay" },
+        { id: "41", statusClass: "hospital", statusText: "In hospital" },
+        { id: "42", statusClass: "ok", statusText: "Okay" },
+        { id: "43", statusClass: "ok", statusText: "Okay" },
+        { id: "44", statusClass: "ok", statusText: "Okay" },
+        { id: "45", statusClass: "ok", statusText: "Okay" },
+      ]);
+
+      const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        members: [
+          {
+            id: 40,
+            name: "Revivable by everyone, while Okay",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+            revive_setting: "Everyone",
+          },
+          {
+            id: 41,
+            name: "Revivable by friends & faction, while Hospitalized",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: {
+              state: "Hospital",
+              description: "In the hospital",
+              until: futureUntil,
+            },
+            revive_setting: "Friends & faction",
+          },
+          {
+            id: 42,
+            name: "No one",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+            revive_setting: "No one",
+          },
+          {
+            id: 43,
+            name: "Unknown",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+            revive_setting: "Unknown",
+          },
+          {
+            id: 44,
+            name: "is_revivable true, revive_setting doesn't say who",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+            revive_setting: "No one",
+            is_revivable: true,
+          },
+          {
+            id: 45,
+            name: "is_revivable false, revive_setting doesn't say who",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+            revive_setting: "Unknown",
+            is_revivable: false,
+          },
+        ],
+      });
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const statusDivFor = (id: string) => {
+        const li = ul?.children.find(
+          (c: any) => c.getAttribute?.("data-player_id") === id,
+        ) as any;
+        return li?.children.find((c: any) =>
+          c.className.includes("status"),
+        ) as any;
+      };
+
+      expect(statusDivFor("40").getAttribute("data-twse-revivable")).toBe(
+        "everyone",
+      );
+      expect(statusDivFor("41").getAttribute("data-twse-revivable")).toBe(
+        "friends-faction",
+      );
+      expect(statusDivFor("42").getAttribute("data-twse-revivable")).toBe(
+        "false",
+      );
+      expect(statusDivFor("43").getAttribute("data-twse-revivable")).toBe(
+        "false",
+      );
+      expect(statusDivFor("44").getAttribute("data-twse-revivable")).toBe(
+        "everyone",
+      );
+      expect(statusDivFor("45").getAttribute("data-twse-revivable")).toBe(
+        "false",
+      );
+
+      spy.mockRestore();
+    });
+
+    it("should always trust the most recent own-poll snapshot's revive_setting, even if it regresses to absent", async () => {
+      const { tornApi } = await import("@utils/api");
+
+      buildWarDOM([{ id: "60", statusClass: "ok", statusText: "Okay" }]);
+
+      const baseMember = {
+        id: 60,
+        name: "Frank",
+        level: 10,
+        last_action: { status: "", timestamp: 0 },
+        status: { state: "Okay" as const, description: "Okay", until: 0 },
+      };
+
+      const spy = vi
+        .spyOn(tornApi, "fetchFactionData")
+        .mockResolvedValueOnce({
+          timestamp: 100,
+          members: [{ ...baseMember, revive_setting: "Everyone" }],
+        })
+        .mockResolvedValueOnce({
+          timestamp: 200,
+          members: [{ ...baseMember }],
+        });
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const statusDiv = () => {
+        const li = ul?.children.find(
+          (c: any) => c.getAttribute?.("data-player_id") === "60",
+        ) as any;
+        return li?.children.find((c: any) =>
+          c.className.includes("status"),
+        ) as any;
+      };
+
+      expect(statusDiv().getAttribute("data-twse-revivable")).toBe("everyone");
+
+      // Advance past minTimeBetweenRequestsMs/poll interval (10s) to trigger
+      // the second poll, whose snapshot doesn't carry revive_setting.
+      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(statusDiv().getAttribute("data-twse-revivable")).toBe("false");
+
+      spy.mockRestore();
+    });
+
+    it("should not let a TWSE Server community-cache snapshot overwrite revive_setting/is_revivable from our own poll", async () => {
+      const { tornApi } = await import("@utils/api");
+      const { twseClient } = await import("@utils/twse-server");
+
+      buildWarDOM([{ id: "70", statusClass: "ok", statusText: "Okay" }]);
+
+      const baseMember = {
+        id: 70,
+        name: "Grace",
+        level: 10,
+        last_action: { status: "", timestamp: 0 },
+        status: { state: "Okay" as const, description: "Okay", until: 0 },
+      };
+
+      const apiSpy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        timestamp: 100,
+        members: [
+          {
+            ...baseMember,
+            revive_setting: "No one",
+            is_revivable: true,
+          },
+        ],
+      });
+      // revive_setting/is_revivable are caller-relative — a community-cache
+      // snapshot contributed by some OTHER user's key can't be trusted for
+      // either, so it must not overwrite what we already established from
+      // our own poll, even with a newer timestamp. The first fetchLatest
+      // call races the initial own poll (both fire as soon as run() starts)
+      // and is harmless here (null = no data); the second, well after our
+      // own poll has settled, carries the untrustworthy overwrite attempt.
+      const twseSpy = vi
+        .spyOn(twseClient, "fetchLatest")
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue({
+          timestamp: 999,
+          members: [
+            {
+              ...baseMember,
+              revive_setting: "Unknown",
+              is_revivable: false,
+            },
+          ],
+        });
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+      // Let queryCache's own 1s poll loop run again (past the first,
+      // harmless call) with the untrustworthy overwrite attempt.
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const ul = documentMock.body.querySelector("ul.members-list") as any;
+      const li = ul?.children.find(
+        (c: any) => c.getAttribute?.("data-player_id") === "70",
+      ) as any;
+      const statusDiv = li?.children.find((c: any) =>
+        c.className.includes("status"),
+      ) as any;
+
+      // revive_setting "No one" alone wouldn't show a marker; it's the
+      // preserved is_revivable: true (our own poll) that keeps it shown.
+      expect(statusDiv.getAttribute("data-twse-revivable")).toBe("everyone");
+
+      apiSpy.mockRestore();
+      twseSpy.mockRestore();
+    });
+
     it("should sort Tier A members newest-first and Tier B members oldest-first", async () => {
       const { tornApi } = await import("@utils/api");
 
@@ -1532,6 +1763,7 @@ describe("WarMonitorFeature Sorting Config", () => {
               description: "Okay",
               until: 0,
             },
+            revive_setting: "Unknown",
           },
           {
             id: 11,
@@ -1543,6 +1775,7 @@ describe("WarMonitorFeature Sorting Config", () => {
               description: "Okay",
               until: 0,
             },
+            revive_setting: "Unknown",
           },
         ],
       });
@@ -1589,6 +1822,7 @@ describe("WarMonitorFeature Sorting Config", () => {
             level: 10,
             last_action: { status: "", timestamp: 0 },
             status: { state: "Okay", description: "Okay", until: 0 },
+            revive_setting: "Unknown",
           },
           {
             id: 30,
@@ -1596,6 +1830,7 @@ describe("WarMonitorFeature Sorting Config", () => {
             level: 10,
             last_action: { status: "", timestamp: 0 },
             status: { state: "Okay", description: "Okay", until: 0 },
+            revive_setting: "Unknown",
           },
         ],
       });

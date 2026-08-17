@@ -27,6 +27,12 @@ _Avoid_: Healed, revived
 **Revival** (verb: **revived**): An unexpected transition where a hospitalized member is healed by an ally, returning them to Okay before their timer expires. A subset of unexpected transitions.
 _Avoid_: Healed, medded
 
+**Revive setting**: The Torn API's `revive_setting` field — a member's own privacy preference for who may revive them (`Everyone`, `Friends & faction`, `No one`, `Unknown`). Reported from the requesting API key's own perspective: `Everyone` resolves the same for any caller, but `Friends & faction` only resolves visibly for a caller who actually qualifies as a friend or faction-mate — a caller who doesn't will see it differently, indistinguishable from a real `No one`/`Unknown`. Since this script only ever queries with the operator's own key, the purple indicator (below) is therefore expected to only ever appear on the operator's own faction's members in practice, never on enemy rows. Only trusted from our own direct Torn API poll (`applyFactionData`'s `source: "own"`); a snapshot relayed through the TWSE Server community cache reflects some other user's key and relationship to the member, so it must never overwrite a `revive_setting` we already have from our own poll.
+_Avoid_: Revival, revivable, revive privacy, revive permission
+
+**Revivable-plus indicator**: The red/purple `"+"` drawn over a member's status cell (`data-twse-revivable`), driven directly by Revive setting — red for `Everyone`, purple for `Friends & faction`, absent for `No one`/`Unknown`/unknown. Shown in any canonical state, not just Hospital, on both sides of the war (own faction and enemy), though purple is only ever expected to actually appear on the operator's own faction's rows per the caller-relativity above.
+_Avoid_: Revival, revivable status
+
 ### Sort model
 
 **Sort group**: The category that places a member's row ahead of or behind other rows in the member list, before any within-group tie-break is applied. The member list orders by sort group first: unexpected transitions, then Tier B, then hospitalized/jailed, then the incoming/abroad/outgoing/traveling sub-groups. Tier A and Tier B are the two sort groups used within the Okay section; the remaining sort groups order non-Okay states.

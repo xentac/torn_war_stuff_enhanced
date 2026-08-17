@@ -15,6 +15,35 @@
   color: #696026 !important;
 }
 
+/* Revivable indicator: a "+" overlaid inside the status div's own box (no
+   padding, no offset outside the box) so it can neither grow the box nor
+   spill into a neighboring cell. Red = revivable by anyone, purple =
+   friends & faction only. */
+.members-list div.status[data-twse-revivable="everyone"],
+.members-list div.status[data-twse-revivable="friends-faction"] {
+  position: relative !important;
+}
+
+.members-list div.status[data-twse-revivable="everyone"]::before,
+.members-list div.status[data-twse-revivable="friends-faction"]::before {
+  content: "+";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.members-list div.status[data-twse-revivable="everyone"]::before {
+  color: #ef4444 !important;
+}
+
+.members-list div.status[data-twse-revivable="friends-faction"]::before {
+  color: #a06bf0 !important;
+}
+
 :root .dark-mode .members-list li:has(div.status[data-twse-highlight="true"]) {
   background-color: #446944 !important;
 }

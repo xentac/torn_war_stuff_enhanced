@@ -33,6 +33,12 @@ export interface FactionMemberStatus {
   last_req_time?: TimestampMs;
 }
 
+export type ReviveSetting =
+  | "Everyone"
+  | "Friends & faction"
+  | "No one"
+  | "Unknown";
+
 export interface FactionMember {
   id: number;
   name: string;
@@ -42,6 +48,8 @@ export interface FactionMember {
     timestamp: TornTimestampSec;
   };
   status: FactionMemberStatus;
+  revive_setting?: ReviveSetting;
+  is_revivable?: boolean;
 }
 
 export interface FactionChain {

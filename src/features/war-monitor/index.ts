@@ -23,7 +23,6 @@ import type {
   DurationSec,
   FactionId,
   FactionMember,
-  FactionMemberStatus,
   FactionResponse,
   TimestampMs,
   TornTimestampMs,
@@ -64,6 +63,7 @@ interface ActiveChainState {
 const TRAVELING = "data-twse-traveling";
 const HIGHLIGHT = "data-twse-highlight";
 const STATUS_DIFFERS = "data-twse-status-differs";
+const REVIVABLE = "data-twse-revivable";
 
 function shouldRunMonitor(): boolean {
   if (!window.location.href.includes("factions.php")) {
@@ -810,9 +810,20 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       // Applies a FactionResponse to members and activeChains.
       // Skips data that is not newer than the last applied timestamp for this faction.
+      // `source` distinguishes our own direct Torn API poll from a snapshot
+      // relayed through the TWSE Server community cache. revive_setting and
+      // is_revivable are both reported from the requesting API key's own
+      // perspective — e.g. a "Friends & faction" setting only resolves
+      // visibly true for a caller who actually qualifies, not for every
+      // caller — so a community snapshot reflects some OTHER user's
+      // relationship to the member, not ours, and can't be told apart from
+      // a real "No one"/"Unknown"/false. Only our own poll is trustworthy
+      // for these two fields; a community snapshot must not overwrite what
+      // we already know from it.
       function applyFactionData(
         factionId: FactionId,
         data: FactionResponse,
+        source: "own" | "community",
       ): void {
         if (data.timestamp !== undefined) {
           const last = lastAppliedTimestamp.get(factionId) ?? 0;
@@ -827,6 +838,12 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           for (const memberData of data.members) {
             const id = String(memberData.id);
             memberData.status.last_req_time = reqTime;
+
+            if (source === "community") {
+              const existing = members.get(id);
+              memberData.revive_setting = existing?.revive_setting;
+              memberData.is_revivable = existing?.is_revivable;
+            }
 
             members.set(id, memberData);
             factionMembers[id] = memberData;
@@ -877,7 +894,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             continue;
           }
 
-          applyFactionData(factionId, data);
+          applyFactionData(factionId, data, "own");
 
           if (userIdHash !== null) {
             twseClient.submit(factionId, {
@@ -904,13 +921,37 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       // and the highlight/overridden flags. The literal display text (location
       // arrows, countdowns) is presentation built here, not part of
       // classifyMember's decision (see classify-member.ts).
+      // revive_setting + is_revivable drive the revivable-plus indicator
+      // (red = anyone can revive, purple = friends & faction only). Shown
+      // regardless of sortGroup/canonical state — it's a standing
+      // setting/flag, not tied to being hospitalized. Both fields are only
+      // ever trustworthy here because applyFactionData refuses to let a
+      // community-cache snapshot overwrite either of them (see the comment
+      // there) — this function doesn't need to know the data's source,
+      // only that by the time it's called, both reflect our own key's
+      // perspective or nothing.
+      function revivableIndicatorValue(
+        member: FactionMember,
+      ): "everyone" | "friends-faction" | "false" {
+        if (member.revive_setting === "Everyone") return "everyone";
+        if (member.revive_setting === "Friends & faction")
+          return "friends-faction";
+        // is_revivable can be true even when revive_setting doesn't
+        // directly say so (e.g. "No one"/"Unknown") — no specific "who"
+        // category to show in that case, so it falls back to the same
+        // marker as "Everyone".
+        if (member.is_revivable) return "everyone";
+        return "false";
+      }
+
       function applyClassification(
         li: HTMLLIElement,
         statusDiv: HTMLDivElement,
-        status: FactionMemberStatus,
+        member: FactionMember,
         classification: MemberClassification,
         tornNow: TornTimestampMs,
       ): void {
+        const status = member.status;
         domWriter.setAttr(
           li,
           "data-sortA",
@@ -1034,6 +1075,12 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           "data-twse-overridden",
           overridden ? "true" : "false",
         );
+
+        domWriter.setAttr(
+          statusDiv,
+          REVIVABLE,
+          revivableIndicatorValue(member),
+        );
       }
 
       function watch() {
@@ -1102,7 +1149,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
             );
           }
 
-          applyClassification(li, statusDiv, status, classification, tornNow);
+          applyClassification(li, statusDiv, member, classification, tornNow);
         });
 
         // Commit all writes at once
@@ -1387,7 +1434,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           if (!running || !foundWar) return;
           for (const factionId of getFactionIds()) {
             const data = await twseClient.fetchLatest(factionId);
-            if (data) applyFactionData(factionId, data);
+            if (data) applyFactionData(factionId, data, "community");
           }
         } finally {
           if (!cacheTimer) {
