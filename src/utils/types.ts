@@ -61,9 +61,50 @@ export interface FactionChain {
   end?: TornTimestampSec;
 }
 
+export interface FactionWarParticipant {
+  id: number;
+  name: string;
+  score: number;
+  chain: number;
+  is_aggressor?: boolean;
+}
+
+export interface FactionRankedWar {
+  war_id: number;
+  start: TornTimestampSec;
+  end: TornTimestampSec | null;
+  target: number;
+  winner: number | null;
+  factions: FactionWarParticipant[];
+}
+
+export interface FactionRaidWar {
+  war_id: number;
+  start: TornTimestampSec;
+  end: TornTimestampSec | null;
+  factions: FactionWarParticipant[];
+}
+
+export interface FactionTerritoryWar {
+  war_id: number;
+  territory: string;
+  start: TornTimestampSec;
+  end: TornTimestampSec | null;
+  target: number;
+  winner: number | null;
+  factions: FactionWarParticipant[];
+}
+
+export interface FactionWars {
+  ranked: FactionRankedWar | null;
+  raids: FactionRaidWar[];
+  territory: FactionTerritoryWar[];
+}
+
 export interface FactionResponse {
   members?: FactionMember[];
   chain?: FactionChain;
+  wars?: FactionWars;
   timestamp?: TornTimestampSec;
   error?: {
     code: number;

@@ -53,6 +53,26 @@ _Avoid_: Flag, badge, status-differs highlight
 **Near-expiry highlight**: The green row background (`data-twse-highlight="true"`) applied to a hospitalized member whose timer is under 5 minutes. Indicates imminent return to Okay.
 _Avoid_: Hospital highlight, green highlight
 
+### War data
+
+**Ranked war**: The faction's current matchmade 1v1 war, sourced from the Torn API v2 `wars` selection (`wars.ranked`, `null` when no ranked war is active). Carries a `target` score, a `winner` (`null` until decided), and each side's Ranked war score and chain.
+_Avoid_: War, the war (ambiguous with Raid war / Territory war)
+
+**Ranked war score**: A faction's per-hit respect total within a Ranked war — the same underlying respect currency as the faction's persistent total, but scoped to the war and reset per war. Races toward the war's `target`; reaching it decides the `winner`.
+_Avoid_: Score (ambiguous with Raid score / Territory war score), respect (ambiguous with the persistent faction total)
+
+**Raid war**: An indefinite, one-sided declared war, sourced from `wars.raids` (an array — a faction can be raiding or be raided by more than one faction at once). Has no `target` or race-to-win condition; ends via the defender's destruction or a negotiated cease, not by reaching a score.
+_Avoid_: Raid (ambiguous with the in-game "raid" verb for a single attack), War
+
+**Raid score**: Cumulative respect taken from the raided faction. Sourced from the same wire `score` field as Ranked war score, but a Raid war has no `target` to race toward — the number only ever goes up.
+_Avoid_: Score, respect taken
+
+**Territory war**: A contest over a single map territory's wall, sourced from `wars.territory` (an array — a faction can hold multiple contested territories at once). Knocking a defending member off the wall replaces them with an attacker; the wall never sits empty.
+_Avoid_: Territory, the war
+
+**Territory war score**: Time-on-wall accumulation toward a Territory war's `target`, distinct from the per-hit respect that drives Ranked war score and Raid score.
+_Avoid_: Score
+
 ### External service
 
 **TWSE Server** (full name: Torn War Stuff Enhanced Server): An external service that aggregates raw Torn API v2 responses contributed by all script users. Any user can query it for a fresher snapshot than their own poll interval would provide — because another user may have called the Torn API more recently. Write path: fire-and-forget POST after each Torn API poll. Read path: supplements the Torn API — delivers other users' updates in the gaps between the client's own 10-second Torn API polls. The Torn API poll is always unconditional; the TWSE Server is not a replacement for it.

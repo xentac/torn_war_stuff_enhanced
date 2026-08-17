@@ -9,7 +9,7 @@ export class TornApiClient {
 
   /**
    * Fetches faction member list status and chain details from the Torn API v2.
-   * Requests 'members', 'chain', and 'timestamp' selections.
+   * Requests 'members', 'wars', 'chain', and 'timestamp' selections.
    */
   public async fetchFactionData(
     factionId: FactionId,
@@ -25,7 +25,7 @@ export class TornApiClient {
     }
 
     // Ask for a timestamp in the future so we don't accidentally get cached data
-    const url = `${this.baseUrl}?id=${factionId}&selections=members,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced&timestamp=${(Date.now() % 1000) + 10}`;
+    const url = `${this.baseUrl}?id=${factionId}&selections=members,wars,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced&timestamp=${(Date.now() % 1000) + 10}`;
 
     try {
       const response = await fetch(url);
