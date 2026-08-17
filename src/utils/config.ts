@@ -11,6 +11,7 @@ enum CONFIG_KEYS {
   BUBBLE_ENABLED = "bubble_enabled",
   COPY_BUTTON_ENABLED = "copy_button_enabled",
   COPY_FORMAT = "copy_format",
+  TWSE_SERVER_ENABLED = "twse_server_enabled",
 }
 
 export type CopyFormat = "name_id" | "rich";
@@ -160,6 +161,18 @@ export class Config {
   }
 
   /**
+   * Checks whether TWSE Server sharing is enabled — gates both submitting
+   * poll results and reading the community cache together (ADR-0009).
+   */
+  get twse_server_enabled(): boolean {
+    return this.storage.get<boolean>(CONFIG_KEYS.TWSE_SERVER_ENABLED) ?? true;
+  }
+
+  set twse_server_enabled(val: boolean) {
+    this.storage.set(CONFIG_KEYS.TWSE_SERVER_ENABLED, val);
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
@@ -171,6 +184,7 @@ export class Config {
     this.storage.remove(CONFIG_KEYS.BUBBLE_ENABLED);
     this.storage.remove(CONFIG_KEYS.COPY_BUTTON_ENABLED);
     this.storage.remove(CONFIG_KEYS.COPY_FORMAT);
+    this.storage.remove(CONFIG_KEYS.TWSE_SERVER_ENABLED);
   }
 }
 

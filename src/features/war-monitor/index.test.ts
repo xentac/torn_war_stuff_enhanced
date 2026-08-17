@@ -1772,6 +1772,45 @@ describe("WarMonitorFeature Sorting Config", () => {
       twseSpy.mockRestore();
     });
 
+    it("should neither submit to nor fetch from the TWSE Server when disabled", async () => {
+      const { tornApi } = await import("@utils/api");
+      const { twseClient } = await import("@utils/twse-server");
+
+      twseconfig.twse_server_enabled = false;
+
+      buildWarDOM([{ id: "70", statusClass: "ok", statusText: "Okay" }]);
+
+      const apiSpy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        timestamp: 100,
+        members: [
+          {
+            id: 70,
+            name: "Grace",
+            level: 10,
+            last_action: { status: "", timestamp: 0 },
+            status: { state: "Okay", description: "Okay", until: 0 },
+          },
+        ],
+      });
+      const submitSpy = vi.spyOn(twseClient, "submit");
+      const fetchLatestSpy = vi.spyOn(twseClient, "fetchLatest");
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(submitSpy).not.toHaveBeenCalled();
+      expect(fetchLatestSpy).not.toHaveBeenCalled();
+
+      apiSpy.mockRestore();
+      submitSpy.mockRestore();
+      fetchLatestSpy.mockRestore();
+      twseconfig.twse_server_enabled = true;
+    });
+
     it("should sort Tier A members newest-first and Tier B members oldest-first", async () => {
       const { tornApi } = await import("@utils/api");
 

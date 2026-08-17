@@ -33,6 +33,12 @@ test("twse-settings-panel renders defaults correctly", async () => {
   ) as HTMLInputElement;
   expect(bubbleCheckbox).not.toBeNull();
   expect(bubbleCheckbox.checked).toBe(true);
+
+  const twseServerCheckbox = el.querySelector(
+    "#twse-server-enabled",
+  ) as HTMLInputElement;
+  expect(twseServerCheckbox).not.toBeNull();
+  expect(twseServerCheckbox.checked).toBe(true);
 });
 
 test("twse-settings-panel reflects property changes dynamically", async () => {
@@ -40,6 +46,7 @@ test("twse-settings-panel reflects property changes dynamically", async () => {
   el.apiKey = "1234567890123456";
   el.warSorting = false;
   el.bubbleEnabled = false;
+  el.twseServerEnabled = false;
 
   document.body.appendChild(el);
   await el.updateComplete;
@@ -56,6 +63,11 @@ test("twse-settings-panel reflects property changes dynamically", async () => {
     "#twse-chain-bubble-toggle",
   ) as HTMLInputElement;
   expect(bubbleCheckbox.checked).toBe(false);
+
+  const twseServerCheckbox = el.querySelector(
+    "#twse-server-enabled",
+  ) as HTMLInputElement;
+  expect(twseServerCheckbox.checked).toBe(false);
 });
 
 test("twse-settings-panel updates drafts on input/change", async () => {
@@ -77,6 +89,14 @@ test("twse-settings-panel updates drafts on input/change", async () => {
   await el.updateComplete;
 
   expect(el.draftWarSorting).toBe(false);
+
+  const twseServerCheckbox = el.querySelector(
+    "#twse-server-enabled",
+  ) as HTMLInputElement;
+  twseServerCheckbox.click();
+  await el.updateComplete;
+
+  expect(el.draftTwseServerEnabled).toBe(false);
 });
 
 test("twse-settings-panel dispatches twse-save event on save button click", async () => {
@@ -101,6 +121,7 @@ test("twse-settings-panel dispatches twse-save event on save button click", asyn
   const event = saveEventMock.mock.calls[0]?.[0] as CustomEvent;
   expect(event.detail.apiKey).toBe("new-saved-key-99");
   expect(event.detail.warSorting).toBe(true);
+  expect(event.detail.twseServerEnabled).toBe(true);
 });
 
 test("twse-settings-panel dispatches twse-reset event on reset button click", async () => {

@@ -8,6 +8,7 @@ const DEFAULT_VALUES = {
   bubbleEnabled: true,
   copyButtonEnabled: true,
   copyFormat: "name_id" as CopyFormat,
+  twseServerEnabled: true,
   debugLogs: false,
   debugForceReactFallback: false,
 };
@@ -22,6 +23,7 @@ type SettingsPanelComponentProps = {
   onBubbleEnabledDraftChange: (val: boolean) => void;
   onCopyButtonEnabledDraftChange: (val: boolean) => void;
   onCopyFormatDraftChange: (val: CopyFormat) => void;
+  onTwseServerEnabledDraftChange: (val: boolean) => void;
   onDebugLogsDraftChange: (val: boolean) => void;
   onDebugForceReactFallbackDraftChange: (val: boolean) => void;
   onSave: () => void;
@@ -40,6 +42,7 @@ export function SettingsPanelComponent({
   onBubbleEnabledDraftChange,
   onCopyButtonEnabledDraftChange,
   onCopyFormatDraftChange,
+  onTwseServerEnabledDraftChange,
   onDebugLogsDraftChange,
   onDebugForceReactFallbackDraftChange,
   onSave,
@@ -154,6 +157,34 @@ export function SettingsPanelComponent({
           </select>
         </div>
 
+        {/* Community Data Sharing */}
+        <h3>Community Data Sharing:</h3>
+
+        <div className="input-row-inline">
+          <input
+            id="twse-server-enabled"
+            type="checkbox"
+            checked={drafts.twseServerEnabled}
+            onChange={(e) =>
+              onTwseServerEnabledDraftChange(
+                (e.target as HTMLInputElement).checked,
+              )
+            }
+          />
+          <label htmlFor="twse-server-enabled">
+            Share and receive faction status updates via the TWSE Server
+          </label>
+          <div className="twse-api-explanation">
+            <strong>Info:</strong> When enabled, this script shares your
+            faction's status data (member statuses, hospital timers, chain
+            state) with the TWSE Server, tagged with a hashed (not reversible)
+            copy of your API key — and in turn receives fresher updates
+            contributed by other users' scripts in the gaps between your own
+            10-second polls. Disabling this stops both: nothing is sent, and no
+            community updates are received.
+          </div>
+        </div>
+
         {/* Debug logs toggle */}
         <div className="input-row-inline">
           <input
@@ -266,6 +297,7 @@ export class TWSESettingsPanel extends HTMLElement {
       bubbleEnabled: this._props.bubbleEnabled,
       copyButtonEnabled: this._props.copyButtonEnabled,
       copyFormat: this._props.copyFormat,
+      twseServerEnabled: this._props.twseServerEnabled,
       debugLogs: this._props.debugLogs,
       debugForceReactFallback: this._props.debugForceReactFallback,
     };
@@ -317,6 +349,11 @@ export class TWSESettingsPanel extends HTMLElement {
         },
         onCopyFormatDraftChange: (val) => {
           this._drafts.copyFormat = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onTwseServerEnabledDraftChange: (val) => {
+          this._drafts.twseServerEnabled = val;
           this._showSavedMessage = false;
           this.render();
         },
@@ -385,6 +422,7 @@ export class TWSESettingsPanel extends HTMLElement {
           bubbleEnabled: this._drafts.bubbleEnabled,
           copyButtonEnabled: this._drafts.copyButtonEnabled,
           copyFormat: this._drafts.copyFormat,
+          twseServerEnabled: this._drafts.twseServerEnabled,
           debugLogs: this._drafts.debugLogs,
           debugForceReactFallback: this._drafts.debugForceReactFallback,
         },
@@ -437,6 +475,15 @@ export class TWSESettingsPanel extends HTMLElement {
   set copyFormat(val: CopyFormat) {
     this._props.copyFormat = val;
     this._drafts.copyFormat = val;
+    this.render();
+  }
+
+  get twseServerEnabled() {
+    return this._props.twseServerEnabled;
+  }
+  set twseServerEnabled(val: boolean) {
+    this._props.twseServerEnabled = val;
+    this._drafts.twseServerEnabled = val;
     this.render();
   }
 
@@ -496,6 +543,14 @@ export class TWSESettingsPanel extends HTMLElement {
   }
   set draftCopyFormat(val: CopyFormat) {
     this._drafts.copyFormat = val;
+    this.render();
+  }
+
+  get draftTwseServerEnabled() {
+    return this._drafts.twseServerEnabled;
+  }
+  set draftTwseServerEnabled(val: boolean) {
+    this._drafts.twseServerEnabled = val;
     this.render();
   }
 

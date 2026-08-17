@@ -913,7 +913,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           applyFactionData(factionId, data, "own");
 
-          if (userIdHash !== null) {
+          if (userIdHash !== null && twseconfig.twse_server_enabled) {
             twseClient.submit(factionId, {
               user_id_hash: userIdHash,
               torn_response: data,
@@ -1489,7 +1489,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
         cacheTimer = null;
         try {
-          if (!running || !foundWar) return;
+          if (!running || !foundWar || !twseconfig.twse_server_enabled) return;
           for (const factionId of getFactionIds()) {
             const data = await twseClient.fetchLatest(factionId);
             if (data) applyFactionData(factionId, data, "community");
