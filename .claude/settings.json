@@ -1,5 +1,29 @@
 {
   "permissions": {
-    "deny": ["Read(./.env)", "Read(./.env.*)"]
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  },
+  "enabledPlugins": {
+    "mattpocock-skills@mattpocock": true,
+    "torn@xentac": true,
+    "tooling@xentac": true
+  },
+  "extraKnownMarketplaces": {
+    "mattpocock": {
+      "source": {
+        "source": "github",
+        "repo": "mattpocock/skills"
+      },
+      "autoUpdate": true
+    },
+    "xentac": {
+      "source": {
+        "source": "github",
+        "repo": "xentac/skills"
+      },
+      "autoUpdate": true
+    }
   }
 }
