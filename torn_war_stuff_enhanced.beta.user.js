@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.2-beta2
+// @version      2.2-beta3
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -324,6 +324,14 @@ get twse_server_enabled() {
     set twse_server_enabled(val) {
       this.storage.set("twse_server_enabled", val);
     }
+get revivable_indicator_enabled() {
+      return this.storage.get(
+        "revivable_indicator_enabled"
+) ?? true;
+    }
+    set revivable_indicator_enabled(val) {
+      this.storage.set("revivable_indicator_enabled", val);
+    }
 reset() {
       this.storage.remove(
         "debug_logs"
@@ -351,6 +359,9 @@ reset() {
 );
       this.storage.remove(
         "twse_server_enabled"
+);
+      this.storage.remove(
+        "revivable_indicator_enabled"
 );
     }
   }
@@ -552,6 +563,7 @@ reset() {
     copyButtonEnabled: true,
     copyFormat: "name_id",
     twseServerEnabled: true,
+    revivableIndicatorEnabled: true,
     debugLogs: false,
     debugForceReactFallback: false
   };
@@ -566,6 +578,7 @@ reset() {
     onCopyButtonEnabledDraftChange,
     onCopyFormatDraftChange,
     onTwseServerEnabledDraftChange,
+    onRevivableIndicatorEnabledDraftChange,
     onDebugLogsDraftChange,
     onDebugForceReactFallbackDraftChange,
     onSave,
@@ -660,6 +673,20 @@ jsx("option", { value: "rich", children: "Name [ID] - Stat estimate - Attack lin
               ]
             }
           )
+        ] }),
+jsxs("div", { className: "input-row-inline", children: [
+jsx(
+            "input",
+            {
+              id: "twse-revivable-indicator-toggle",
+              type: "checkbox",
+              checked: drafts.revivableIndicatorEnabled,
+              onChange: (e) => onRevivableIndicatorEnabledDraftChange(
+                e.target.checked
+              )
+            }
+          ),
+jsx("label", { htmlFor: "twse-revivable-indicator-toggle", children: "Show revivable-plus indicator (red/purple + over status)" })
         ] }),
 jsx("h3", { children: "Community Data Sharing:" }),
 jsxs("div", { className: "input-row-inline", children: [
@@ -784,6 +811,7 @@ jsx(
         copyButtonEnabled: this._props.copyButtonEnabled,
         copyFormat: this._props.copyFormat,
         twseServerEnabled: this._props.twseServerEnabled,
+        revivableIndicatorEnabled: this._props.revivableIndicatorEnabled,
         debugLogs: this._props.debugLogs,
         debugForceReactFallback: this._props.debugForceReactFallback
       };
@@ -837,6 +865,11 @@ jsx(
           },
           onTwseServerEnabledDraftChange: (val) => {
             this._drafts.twseServerEnabled = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onRevivableIndicatorEnabledDraftChange: (val) => {
+            this._drafts.revivableIndicatorEnabled = val;
             this._showSavedMessage = false;
             this.render();
           },
@@ -900,6 +933,7 @@ jsx(
             copyButtonEnabled: this._drafts.copyButtonEnabled,
             copyFormat: this._drafts.copyFormat,
             twseServerEnabled: this._drafts.twseServerEnabled,
+            revivableIndicatorEnabled: this._drafts.revivableIndicatorEnabled,
             debugLogs: this._drafts.debugLogs,
             debugForceReactFallback: this._drafts.debugForceReactFallback
           },
@@ -954,6 +988,14 @@ get apiKey() {
     set twseServerEnabled(val) {
       this._props.twseServerEnabled = val;
       this._drafts.twseServerEnabled = val;
+      this.render();
+    }
+    get revivableIndicatorEnabled() {
+      return this._props.revivableIndicatorEnabled;
+    }
+    set revivableIndicatorEnabled(val) {
+      this._props.revivableIndicatorEnabled = val;
+      this._drafts.revivableIndicatorEnabled = val;
       this.render();
     }
     get debugLogs() {
@@ -1014,6 +1056,13 @@ get draftApiKey() {
       this._drafts.twseServerEnabled = val;
       this.render();
     }
+    get draftRevivableIndicatorEnabled() {
+      return this._drafts.revivableIndicatorEnabled;
+    }
+    set draftRevivableIndicatorEnabled(val) {
+      this._drafts.revivableIndicatorEnabled = val;
+      this.render();
+    }
     get draftDebugLogs() {
       return this._drafts.debugLogs;
     }
@@ -1053,6 +1102,7 @@ get draftApiKey() {
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
       panel.copyFormat = twseconfig.copy_format;
       panel.twseServerEnabled = twseconfig.twse_server_enabled;
+      panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
       panel.addEventListener("twse-save", (e) => {
@@ -1063,6 +1113,7 @@ get draftApiKey() {
         twseconfig.copy_button_enabled = detail.copyButtonEnabled;
         twseconfig.copy_format = detail.copyFormat;
         twseconfig.twse_server_enabled = detail.twseServerEnabled;
+        twseconfig.revivable_indicator_enabled = detail.revivableIndicatorEnabled;
         twseconfig.debug_logs = detail.debugLogs;
         twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
         log$5.info("Settings saved successfully");
@@ -1076,6 +1127,7 @@ get draftApiKey() {
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
         panel.copyFormat = twseconfig.copy_format;
         panel.twseServerEnabled = twseconfig.twse_server_enabled;
+        panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
         panel.debugLogs = twseconfig.debug_logs;
         panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
         log$5.info("Settings reset to defaults");
@@ -1496,7 +1548,7 @@ submit(factionId, payload) {
     }
   }
   const twseClient = new TwseServerClient();
-  const stylesCss = '.members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}.members-list div.status[data-twse-revivable=everyone],.members-list div.status[data-twse-revivable=friends-faction]{position:relative!important}.members-list div.status[data-twse-revivable=everyone]:before,.members-list div.status[data-twse-revivable=friends-faction]:before{content:"+";position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:800;line-height:1}.members-list div.status[data-twse-revivable=everyone]:before{color:#ef4444!important}.members-list div.status[data-twse-revivable=friends-faction]:before{color:#a06bf0!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}.twse-chain-presence{font-family:monospace;color:#bbb}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}';
+  const stylesCss = '.members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone],body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]{position:relative!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before,body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{content:"+";position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:800;line-height:1}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before{color:#ef4444!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{color:#a06bf0!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}.twse-chain-presence{font-family:monospace;color:#bbb}.twse-presence-online{color:#a3d900}.twse-presence-idle{color:#ffbf00}.twse-presence-offline{color:#ccc}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}';
   importCSS(stylesCss);
   var SortGroup = ((SortGroup2) => {
     SortGroup2["UnexpectedOkay"] = "UnexpectedOkay";
@@ -1798,6 +1850,10 @@ submit(factionId, payload) {
           document.body.classList.toggle(
             "twse-bubble-disabled",
             !twseconfig.bubble_enabled
+          );
+          document.body.classList.toggle(
+            "twse-revivable-disabled",
+            !twseconfig.revivable_indicator_enabled
           );
         };
         syncBodyClasses();
@@ -2572,6 +2628,11 @@ submit(factionId, payload) {
           const text = count === null ? "-" : String(count);
           return text.padStart(2, " ");
         }
+        function formatPresenceSlotHtml(presence, count) {
+          const text = formatPresenceSlot(count);
+          if (count === null) return text;
+          return `<span class="twse-presence-${presence}">${text}</span>`;
+        }
         function updateChainBubble() {
           if (!bubbleContainer || isDragging) return;
           if (!foundWar || activeChains.size === 0) {
@@ -2612,10 +2673,10 @@ submit(factionId, payload) {
             }
             const presence = presenceCounts.get(factionId);
             const presenceText = [
-              presence?.online ?? null,
-              presence?.idle ?? null,
-              presence?.offline ?? null
-            ].map(formatPresenceSlot).join("/");
+              formatPresenceSlotHtml("online", presence?.online ?? null),
+              formatPresenceSlotHtml("idle", presence?.idle ?? null),
+              formatPresenceSlotHtml("offline", presence?.offline ?? null)
+            ].join("/");
             html += `
             <div class="twse-chain-row">
               <div class="twse-chain-stats">
