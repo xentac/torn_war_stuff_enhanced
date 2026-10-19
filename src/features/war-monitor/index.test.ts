@@ -919,8 +919,11 @@ describe("WarMonitorFeature Sorting Config", () => {
     expect(bubble.className).not.toContain("hidden");
     // Presence counts (online/idle/offline): 2 online, 1 idle, 1 offline,
     // the unparseable 5th row excluded from all three. Each count is padded
-    // to 2 digits with a non-breaking space so the columns stay aligned.
-    expect(bubble.innerHTML).toContain(" 2/ 1/ 1");
+    // to 2 digits with a non-breaking space so the columns stay aligned,
+    // and wrapped in a span coloured like Torn's own presence icon.
+    expect(bubble.innerHTML).toContain(
+      '<span class="twse-presence-online"> 2</span>/<span class="twse-presence-idle"> 1</span>/<span class="twse-presence-offline"> 1</span>',
+    );
 
     // Test negative countdown scenario (expired chain before next poll)
     mockChainData.timeout = 2;
@@ -930,6 +933,63 @@ describe("WarMonitorFeature Sorting Config", () => {
     await vi.advanceTimersByTimeAsync(7000);
 
     expect(bubble.innerHTML).toMatch(/-0:04|-0:05/);
+
+    vi.useRealTimers();
+    spy.mockRestore();
+  });
+
+  it("should render uncoloured '-' presence placeholders when a faction has no presence tally", async () => {
+    const { tornApi } = await import("@utils/api");
+    const { twseconfig } = await import("@utils/config");
+
+    twseconfig.apiKey = "1234567890123456"; // 16 chars
+
+    const spy = vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+      members: [],
+      chain: {
+        current: 42,
+        max: 100,
+        timeout: 120,
+        modifier: 1.5,
+        cooldown: 0,
+        end: Date.now() / 1000 + 120,
+      },
+    });
+
+    // Faction war DOM with a member list but no rows carrying a presence
+    // aria-label, so the faction never gets a presence tally.
+    const factionWarList = new MockElement("div");
+    factionWarList.id = "faction_war_list_id";
+
+    const descriptions = new MockElement("div");
+    descriptions.className = "descriptions faction-war";
+
+    const ul = new MockElement("ul");
+    ul.className = "members-list";
+    const atag = new MockElement("a");
+    atag.setAttribute("href", "/factions.php?ID=999");
+    ul.appendChild(atag);
+
+    descriptions.appendChild(ul);
+    factionWarList.appendChild(descriptions);
+    documentMock.body.appendChild(factionWarList);
+
+    global.MutationObserver = class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    } as any;
+
+    vi.useFakeTimers();
+
+    WarMonitorFeature.run();
+
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(500);
+
+    const bubble = documentMock.getElementById("twse-chain-bubble") as any;
+    expect(bubble.innerHTML).toContain("42/100");
+    expect(bubble.innerHTML).toContain(" -/ -/ -");
+    expect(bubble.innerHTML).not.toContain("twse-presence-");
 
     vi.useRealTimers();
     spy.mockRestore();

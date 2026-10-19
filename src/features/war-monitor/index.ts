@@ -36,7 +36,7 @@ import {
   parseCanonicalStatus,
   SortGroup,
 } from "./classify-member";
-import type { PresenceCounts } from "./torn-war-page";
+import type { Presence, PresenceCounts } from "./torn-war-page";
 import {
   getFactionIds,
   getFactionMemberLists,
@@ -1250,6 +1250,18 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         return text.padStart(2, " ");
       }
 
+      // Wraps a presence count in a span coloured like Torn's own status icon
+      // for that presence. The "-" placeholder is left unwrapped so it stays
+      // the neutral bubble grey rather than implying a count.
+      function formatPresenceSlotHtml(
+        presence: Presence,
+        count: number | null,
+      ): string {
+        const text = formatPresenceSlot(count);
+        if (count === null) return text;
+        return `<span class="twse-presence-${presence}">${text}</span>`;
+      }
+
       function updateChainBubble() {
         if (!bubbleContainer || isDragging) return;
 
@@ -1302,12 +1314,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           const presence = presenceCounts.get(factionId);
           const presenceText = [
-            presence?.online ?? null,
-            presence?.idle ?? null,
-            presence?.offline ?? null,
-          ]
-            .map(formatPresenceSlot)
-            .join("/");
+            formatPresenceSlotHtml("online", presence?.online ?? null),
+            formatPresenceSlotHtml("idle", presence?.idle ?? null),
+            formatPresenceSlotHtml("offline", presence?.offline ?? null),
+          ].join("/");
 
           html += `
             <div class="twse-chain-row">

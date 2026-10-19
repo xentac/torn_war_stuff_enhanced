@@ -286,6 +286,19 @@ body:not(.twse-revivable-disabled)
   color: #bbb;
 }
 
+/* Top stops of Torn's own userStatusOnline/Idle/Offline icon gradients */
+.twse-presence-online {
+  color: #a3d900;
+}
+
+.twse-presence-idle {
+  color: #ffbf00;
+}
+
+.twse-presence-offline {
+  color: #ccc;
+}
+
 @keyframes twse-pulse {
   from {
     box-shadow: 0 0 2px rgba(255, 82, 82, 0.4);
