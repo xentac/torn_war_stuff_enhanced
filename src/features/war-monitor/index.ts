@@ -36,6 +36,7 @@ import {
   parseCanonicalStatus,
   SortGroup,
 } from "./classify-member";
+import { PresenceAlertTracker } from "./presence-alerts";
 import type { Presence, PresenceCounts } from "./torn-war-page";
 import {
   getFactionIds,
@@ -208,6 +209,11 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       // as a side effect of the per-member walk that function already does —
       // read here by updateChainBubble rather than re-querying the DOM.
       let presenceCounts = new Map<string, PresenceCounts>();
+      // Presence alerts (GLOSSARY.md), recomputed from presenceCounts each
+      // watch() tick. In memory only: history and armed state start fresh on
+      // reload.
+      let presenceAlertTracker = new PresenceAlertTracker();
+      let presenceAlertFactions = new Set<FactionId>();
       const lastAppliedTimestamp = new Map<FactionId, number>();
       let cachedUserIdHashKey: string | null = null;
       let cachedUserIdHash: string | null = null;
@@ -236,6 +242,8 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         unexpectedTransitions.clear();
         okaySinceTimestamps.clear();
         lastAppliedTimestamp.clear();
+        presenceAlertTracker = new PresenceAlertTracker();
+        presenceAlertFactions = new Set();
         updateStatuses();
       };
       window.addEventListener("twse-clear-cache", onClearCache);
@@ -1236,6 +1244,24 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         }
 
         presenceCounts = nextPresenceCounts;
+        // Detection runs regardless of window focus; only the visual is
+        // focus-gated, in CSS (ADR-0007).
+        presenceAlertFactions = twseconfig.presence_alerts_enabled
+          ? presenceAlertTracker.update(
+              getCurrentTime(),
+              new Map(
+                Array.from(presenceCounts, ([factionId, tally]) => [
+                  factionId,
+                  tally.online,
+                ]),
+              ),
+              {
+                surgeMembers: twseconfig.presence_surge_members,
+                surgeWindowMs: twseconfig.presence_surge_window_min * 60_000,
+                gapMembers: twseconfig.presence_gap_members,
+              },
+            )
+          : new Set();
         updateChainBubble();
       }
 
@@ -1252,14 +1278,17 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
       // Wraps a presence count in a span coloured like Torn's own status icon
       // for that presence. The "-" placeholder is left unwrapped so it stays
-      // the neutral bubble grey rather than implying a count.
+      // the neutral bubble grey rather than implying a count. `alert` marks
+      // the slot for a Presence alert flash.
       function formatPresenceSlotHtml(
         presence: Presence,
         count: number | null,
+        alert = false,
       ): string {
         const text = formatPresenceSlot(count);
         if (count === null) return text;
-        return `<span class="twse-presence-${presence}">${text}</span>`;
+        const alertClass = alert ? " twse-presence-alert" : "";
+        return `<span class="twse-presence-${presence}${alertClass}">${text}</span>`;
       }
 
       function updateChainBubble() {
@@ -1314,7 +1343,11 @@ const WarMonitorFeature: WarMonitorFeatureType = {
 
           const presence = presenceCounts.get(factionId);
           const presenceText = [
-            formatPresenceSlotHtml("online", presence?.online ?? null),
+            formatPresenceSlotHtml(
+              "online",
+              presence?.online ?? null,
+              presenceAlertFactions.has(factionId),
+            ),
             formatPresenceSlotHtml("idle", presence?.idle ?? null),
             formatPresenceSlotHtml("offline", presence?.offline ?? null),
           ].join("/");

@@ -13,9 +13,45 @@ enum CONFIG_KEYS {
   COPY_FORMAT = "copy_format",
   TWSE_SERVER_ENABLED = "twse_server_enabled",
   REVIVABLE_INDICATOR_ENABLED = "revivable_indicator_enabled",
+  PRESENCE_ALERTS_ENABLED = "presence_alerts_enabled",
+  PRESENCE_SURGE_MEMBERS = "presence_surge_members",
+  PRESENCE_SURGE_WINDOW_MIN = "presence_surge_window_min",
+  PRESENCE_GAP_MEMBERS = "presence_gap_members",
 }
 
 export type CopyFormat = "name_id" | "rich";
+
+interface IntRange {
+  min: number;
+  max: number;
+  default: number;
+}
+
+export const PRESENCE_SURGE_MEMBERS_RANGE: IntRange = {
+  min: 1,
+  max: 50,
+  default: 5,
+};
+export const PRESENCE_SURGE_WINDOW_MIN_RANGE: IntRange = {
+  min: 1,
+  max: 30,
+  default: 5,
+};
+export const PRESENCE_GAP_MEMBERS_RANGE: IntRange = {
+  min: 1,
+  max: 50,
+  default: 5,
+};
+
+/**
+ * Clamps a numeric setting to its range, rounding to a whole number. Anything
+ * that isn't a finite number (NaN from an empty input, junk in storage) falls
+ * back to the default. Used on both write and read.
+ */
+function clampInt(val: unknown, range: IntRange): number {
+  if (typeof val !== "number" || !Number.isFinite(val)) return range.default;
+  return Math.min(range.max, Math.max(range.min, Math.round(val)));
+}
 
 export class Config {
   private storage: Storage;
@@ -189,6 +225,71 @@ export class Config {
   }
 
   /**
+   * Checks whether Presence alerts (GLOSSARY.md) flash a faction's online
+   * count in the chain bubble.
+   */
+  get presence_alerts_enabled(): boolean {
+    return (
+      this.storage.get<boolean>(CONFIG_KEYS.PRESENCE_ALERTS_ENABLED) ?? true
+    );
+  }
+
+  set presence_alerts_enabled(val: boolean) {
+    this.storage.set(CONFIG_KEYS.PRESENCE_ALERTS_ENABLED, val);
+  }
+
+  /**
+   * Presence surge threshold (X): online members above the trough.
+   */
+  get presence_surge_members(): number {
+    return clampInt(
+      this.storage.get<number>(CONFIG_KEYS.PRESENCE_SURGE_MEMBERS),
+      PRESENCE_SURGE_MEMBERS_RANGE,
+    );
+  }
+
+  set presence_surge_members(val: number) {
+    this.storage.set(
+      CONFIG_KEYS.PRESENCE_SURGE_MEMBERS,
+      clampInt(val, PRESENCE_SURGE_MEMBERS_RANGE),
+    );
+  }
+
+  /**
+   * Presence surge trailing window (T), in minutes.
+   */
+  get presence_surge_window_min(): number {
+    return clampInt(
+      this.storage.get<number>(CONFIG_KEYS.PRESENCE_SURGE_WINDOW_MIN),
+      PRESENCE_SURGE_WINDOW_MIN_RANGE,
+    );
+  }
+
+  set presence_surge_window_min(val: number) {
+    this.storage.set(
+      CONFIG_KEYS.PRESENCE_SURGE_WINDOW_MIN,
+      clampInt(val, PRESENCE_SURGE_WINDOW_MIN_RANGE),
+    );
+  }
+
+  /**
+   * Presence gap threshold (Y): online member difference between factions.
+   */
+  get presence_gap_members(): number {
+    return clampInt(
+      this.storage.get<number>(CONFIG_KEYS.PRESENCE_GAP_MEMBERS),
+      PRESENCE_GAP_MEMBERS_RANGE,
+    );
+  }
+
+  set presence_gap_members(val: number) {
+    this.storage.set(
+      CONFIG_KEYS.PRESENCE_GAP_MEMBERS,
+      clampInt(val, PRESENCE_GAP_MEMBERS_RANGE),
+    );
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
@@ -202,6 +303,10 @@ export class Config {
     this.storage.remove(CONFIG_KEYS.COPY_FORMAT);
     this.storage.remove(CONFIG_KEYS.TWSE_SERVER_ENABLED);
     this.storage.remove(CONFIG_KEYS.REVIVABLE_INDICATOR_ENABLED);
+    this.storage.remove(CONFIG_KEYS.PRESENCE_ALERTS_ENABLED);
+    this.storage.remove(CONFIG_KEYS.PRESENCE_SURGE_MEMBERS);
+    this.storage.remove(CONFIG_KEYS.PRESENCE_SURGE_WINDOW_MIN);
+    this.storage.remove(CONFIG_KEYS.PRESENCE_GAP_MEMBERS);
   }
 }
 

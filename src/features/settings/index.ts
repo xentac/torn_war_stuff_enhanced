@@ -35,6 +35,10 @@ const SettingsFeature: Feature = {
     panel.copyFormat = twseconfig.copy_format;
     panel.twseServerEnabled = twseconfig.twse_server_enabled;
     panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+    panel.presenceAlertsEnabled = twseconfig.presence_alerts_enabled;
+    panel.presenceSurgeMembers = twseconfig.presence_surge_members;
+    panel.presenceSurgeWindowMin = twseconfig.presence_surge_window_min;
+    panel.presenceGapMembers = twseconfig.presence_gap_members;
     panel.debugLogs = twseconfig.debug_logs;
     panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 
@@ -48,8 +52,17 @@ const SettingsFeature: Feature = {
       twseconfig.copy_format = detail.copyFormat;
       twseconfig.twse_server_enabled = detail.twseServerEnabled;
       twseconfig.revivable_indicator_enabled = detail.revivableIndicatorEnabled;
+      twseconfig.presence_alerts_enabled = detail.presenceAlertsEnabled;
+      twseconfig.presence_surge_members = detail.presenceSurgeMembers;
+      twseconfig.presence_surge_window_min = detail.presenceSurgeWindowMin;
+      twseconfig.presence_gap_members = detail.presenceGapMembers;
       twseconfig.debug_logs = detail.debugLogs;
       twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
+
+      // Reflect the clamped values back so the panel shows what was stored.
+      panel.presenceSurgeMembers = twseconfig.presence_surge_members;
+      panel.presenceSurgeWindowMin = twseconfig.presence_surge_window_min;
+      panel.presenceGapMembers = twseconfig.presence_gap_members;
 
       log.info("Settings saved successfully");
 
@@ -69,6 +82,10 @@ const SettingsFeature: Feature = {
       panel.copyFormat = twseconfig.copy_format;
       panel.twseServerEnabled = twseconfig.twse_server_enabled;
       panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+      panel.presenceAlertsEnabled = twseconfig.presence_alerts_enabled;
+      panel.presenceSurgeMembers = twseconfig.presence_surge_members;
+      panel.presenceSurgeWindowMin = twseconfig.presence_surge_window_min;
+      panel.presenceGapMembers = twseconfig.presence_gap_members;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 

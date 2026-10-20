@@ -995,6 +995,118 @@ describe("WarMonitorFeature Sorting Config", () => {
     spy.mockRestore();
   });
 
+  describe("Presence alerts", () => {
+    // Two factions' member lists, each row carrying a presence aria-label.
+    // Both need a tally for a Presence gap to be evaluated at all.
+    function setupTwoFactionPresence(
+      factions: [factionId: string, labels: string[]][],
+    ) {
+      const factionWarList = new MockElement("div");
+      factionWarList.id = "faction_war_list_id";
+      const descriptions = new MockElement("div");
+      descriptions.className = "descriptions faction-war";
+
+      let nextId = 9000;
+      factions.forEach(([factionId, labels], i) => {
+        const ul = new MockElement("ul");
+        ul.className = "members-list";
+        const atag = new MockElement("a");
+        atag.setAttribute("href", `/factions.php?ID=${factionId}`);
+        ul.appendChild(atag);
+        for (const label of labels) {
+          const li = new MockElement("li");
+          li.className = i === 0 ? "enemy" : "your";
+          const profileAnchor = new MockElement("a");
+          profileAnchor.setAttribute("href", `/profiles.php?XID=${nextId++}`);
+          li.appendChild(profileAnchor);
+          const statusIcon = new MockElement("div");
+          statusIcon.setAttribute("aria-label", label);
+          li.appendChild(statusIcon);
+          ul.appendChild(li);
+        }
+        descriptions.appendChild(ul);
+      });
+
+      factionWarList.appendChild(descriptions);
+      documentMock.body.appendChild(factionWarList);
+
+      global.MutationObserver = class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      } as any;
+    }
+
+    async function renderBubble(): Promise<string> {
+      const { tornApi } = await import("@utils/api");
+      const { twseconfig } = await import("@utils/config");
+      twseconfig.apiKey = "1234567890123456"; // 16 chars
+
+      vi.spyOn(tornApi, "fetchFactionData").mockResolvedValue({
+        members: [],
+        chain: {
+          current: 42,
+          max: 100,
+          timeout: 120,
+          modifier: 1.5,
+          cooldown: 0,
+          end: Date.now() / 1000 + 120,
+        },
+      });
+
+      // 5 online vs 0 online: a Presence gap of 5 (the default Y) already
+      // exists at page load, which counts as a crossing.
+      setupTwoFactionPresence([
+        [
+          "111",
+          [
+            "A is online",
+            "B is online",
+            "C is online",
+            "D is online",
+            "E is online",
+            "F is idle",
+          ],
+        ],
+        ["222", ["G is idle", "H is offline"]],
+      ]);
+
+      vi.useFakeTimers();
+      WarMonitorFeature.run();
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const bubble = documentMock.getElementById("twse-chain-bubble") as any;
+      const html: string = bubble.innerHTML;
+      vi.useRealTimers();
+      return html;
+    }
+
+    it("adds twse-presence-alert to the leading faction's online span only", async () => {
+      const html = await renderBubble();
+
+      expect(html).toContain(
+        '<span class="twse-presence-online twse-presence-alert">\u00a05</span>/<span class="twse-presence-idle">\u00a01</span>/<span class="twse-presence-offline">\u00a00</span>',
+      );
+      expect(html).toContain(
+        '<span class="twse-presence-online">\u00a00</span>/<span class="twse-presence-idle">\u00a01</span>/<span class="twse-presence-offline">\u00a01</span>',
+      );
+      // Only the one online slot alerts; idle/offline never do.
+      expect(html.match(/twse-presence-alert/g)).toHaveLength(1);
+    });
+
+    it("adds no twse-presence-alert when Presence alerts are disabled", async () => {
+      const { twseconfig } = await import("@utils/config");
+      twseconfig.presence_alerts_enabled = false;
+
+      const html = await renderBubble();
+
+      expect(html).toContain(
+        '<span class="twse-presence-online">\u00a05</span>',
+      );
+      expect(html).not.toContain("twse-presence-alert");
+    });
+  });
+
   it("should persist and recover bubble position and clamp to viewport limits on resize", async () => {
     const { twseconfig } = await import("@utils/config");
 

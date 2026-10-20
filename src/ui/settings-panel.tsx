@@ -1,4 +1,9 @@
-import type { CopyFormat } from "@utils/config";
+import {
+  type CopyFormat,
+  PRESENCE_GAP_MEMBERS_RANGE,
+  PRESENCE_SURGE_MEMBERS_RANGE,
+  PRESENCE_SURGE_WINDOW_MIN_RANGE,
+} from "@utils/config";
 import { createElement, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -10,6 +15,10 @@ const DEFAULT_VALUES = {
   copyFormat: "name_id" as CopyFormat,
   twseServerEnabled: true,
   revivableIndicatorEnabled: true,
+  presenceAlertsEnabled: true,
+  presenceSurgeMembers: PRESENCE_SURGE_MEMBERS_RANGE.default,
+  presenceSurgeWindowMin: PRESENCE_SURGE_WINDOW_MIN_RANGE.default,
+  presenceGapMembers: PRESENCE_GAP_MEMBERS_RANGE.default,
   debugLogs: false,
   debugForceReactFallback: false,
 };
@@ -26,6 +35,10 @@ type SettingsPanelComponentProps = {
   onCopyFormatDraftChange: (val: CopyFormat) => void;
   onTwseServerEnabledDraftChange: (val: boolean) => void;
   onRevivableIndicatorEnabledDraftChange: (val: boolean) => void;
+  onPresenceAlertsEnabledDraftChange: (val: boolean) => void;
+  onPresenceSurgeMembersDraftChange: (val: number) => void;
+  onPresenceSurgeWindowMinDraftChange: (val: number) => void;
+  onPresenceGapMembersDraftChange: (val: number) => void;
   onDebugLogsDraftChange: (val: boolean) => void;
   onDebugForceReactFallbackDraftChange: (val: boolean) => void;
   onSave: () => void;
@@ -46,6 +59,10 @@ export function SettingsPanelComponent({
   onCopyFormatDraftChange,
   onTwseServerEnabledDraftChange,
   onRevivableIndicatorEnabledDraftChange,
+  onPresenceAlertsEnabledDraftChange,
+  onPresenceSurgeMembersDraftChange,
+  onPresenceSurgeWindowMinDraftChange,
+  onPresenceGapMembersDraftChange,
   onDebugLogsDraftChange,
   onDebugForceReactFallbackDraftChange,
   onSave,
@@ -177,6 +194,19 @@ export function SettingsPanelComponent({
           </label>
         </div>
 
+        {/* Presence Alerts */}
+        <PresenceAlertsSettings
+          drafts={drafts}
+          onPresenceAlertsEnabledDraftChange={
+            onPresenceAlertsEnabledDraftChange
+          }
+          onPresenceSurgeMembersDraftChange={onPresenceSurgeMembersDraftChange}
+          onPresenceSurgeWindowMinDraftChange={
+            onPresenceSurgeWindowMinDraftChange
+          }
+          onPresenceGapMembersDraftChange={onPresenceGapMembersDraftChange}
+        />
+
         {/* Community Data Sharing */}
         <h3>Community Data Sharing:</h3>
 
@@ -283,6 +313,111 @@ export function SettingsPanelComponent({
   );
 }
 
+type PresenceAlertsSettingsProps = Pick<
+  SettingsPanelComponentProps,
+  | "drafts"
+  | "onPresenceAlertsEnabledDraftChange"
+  | "onPresenceSurgeMembersDraftChange"
+  | "onPresenceSurgeWindowMinDraftChange"
+  | "onPresenceGapMembersDraftChange"
+>;
+
+function PresenceAlertsSettings({
+  drafts,
+  onPresenceAlertsEnabledDraftChange,
+  onPresenceSurgeMembersDraftChange,
+  onPresenceSurgeWindowMinDraftChange,
+  onPresenceGapMembersDraftChange,
+}: PresenceAlertsSettingsProps) {
+  return (
+    <>
+      <h3>Presence Alerts:</h3>
+
+      <div className="input-row-inline">
+        <input
+          id="twse-presence-alerts-toggle"
+          type="checkbox"
+          checked={drafts.presenceAlertsEnabled}
+          onChange={(e) =>
+            onPresenceAlertsEnabledDraftChange(
+              (e.target as HTMLInputElement).checked,
+            )
+          }
+        />
+        <label htmlFor="twse-presence-alerts-toggle">
+          Flash a faction's online count in the chain bubble on a presence surge
+          or gap
+        </label>
+        <div className="twse-api-explanation">
+          <strong>Info:</strong> A faction's online count (idle doesn't count)
+          flashes while it has gained at least the surge number of online
+          members within the surge window (a presence surge). When one side has
+          at least the gap number more members online than the other, the side
+          ahead flashes for 60 seconds (a presence gap), and won't flash again
+          until the difference drops to the gap number minus two or less.
+          Flashes only show while this window is focused. This is a presence
+          signal, not a guarantee of a push.
+        </div>
+      </div>
+
+      <NumberSetting
+        id="twse-presence-surge-members"
+        label="Surge: members"
+        range={PRESENCE_SURGE_MEMBERS_RANGE}
+        value={drafts.presenceSurgeMembers}
+        onChange={onPresenceSurgeMembersDraftChange}
+      />
+      <NumberSetting
+        id="twse-presence-surge-window-min"
+        label="Surge: window, minutes"
+        range={PRESENCE_SURGE_WINDOW_MIN_RANGE}
+        value={drafts.presenceSurgeWindowMin}
+        onChange={onPresenceSurgeWindowMinDraftChange}
+      />
+      <NumberSetting
+        id="twse-presence-gap-members"
+        label="Gap: members"
+        range={PRESENCE_GAP_MEMBERS_RANGE}
+        value={drafts.presenceGapMembers}
+        onChange={onPresenceGapMembersDraftChange}
+      />
+    </>
+  );
+}
+
+type NumberSettingProps = {
+  id: string;
+  label: string;
+  range: { min: number; max: number };
+  value: number;
+  onChange: (val: number) => void;
+};
+
+function NumberSetting({
+  id,
+  label,
+  range,
+  value,
+  onChange,
+}: NumberSettingProps) {
+  return (
+    <div className="input-row-inline">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="number"
+        min={range.min}
+        max={range.max}
+        step={1}
+        // An emptied number input reads back as NaN; render it as an empty
+        // field rather than passing NaN to React.
+        value={Number.isNaN(value) ? "" : value}
+        onChange={(e) => onChange((e.target as HTMLInputElement).valueAsNumber)}
+      />
+    </div>
+  );
+}
+
 export class TWSESettingsPanel extends HTMLElement {
   private _props = { ...DEFAULT_VALUES };
   private _drafts = { ...DEFAULT_VALUES };
@@ -319,6 +454,10 @@ export class TWSESettingsPanel extends HTMLElement {
       copyFormat: this._props.copyFormat,
       twseServerEnabled: this._props.twseServerEnabled,
       revivableIndicatorEnabled: this._props.revivableIndicatorEnabled,
+      presenceAlertsEnabled: this._props.presenceAlertsEnabled,
+      presenceSurgeMembers: this._props.presenceSurgeMembers,
+      presenceSurgeWindowMin: this._props.presenceSurgeWindowMin,
+      presenceGapMembers: this._props.presenceGapMembers,
       debugLogs: this._props.debugLogs,
       debugForceReactFallback: this._props.debugForceReactFallback,
     };
@@ -380,6 +519,26 @@ export class TWSESettingsPanel extends HTMLElement {
         },
         onRevivableIndicatorEnabledDraftChange: (val) => {
           this._drafts.revivableIndicatorEnabled = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onPresenceAlertsEnabledDraftChange: (val) => {
+          this._drafts.presenceAlertsEnabled = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onPresenceSurgeMembersDraftChange: (val) => {
+          this._drafts.presenceSurgeMembers = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onPresenceSurgeWindowMinDraftChange: (val) => {
+          this._drafts.presenceSurgeWindowMin = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onPresenceGapMembersDraftChange: (val) => {
+          this._drafts.presenceGapMembers = val;
           this._showSavedMessage = false;
           this.render();
         },
@@ -450,6 +609,10 @@ export class TWSESettingsPanel extends HTMLElement {
           copyFormat: this._drafts.copyFormat,
           twseServerEnabled: this._drafts.twseServerEnabled,
           revivableIndicatorEnabled: this._drafts.revivableIndicatorEnabled,
+          presenceAlertsEnabled: this._drafts.presenceAlertsEnabled,
+          presenceSurgeMembers: this._drafts.presenceSurgeMembers,
+          presenceSurgeWindowMin: this._drafts.presenceSurgeWindowMin,
+          presenceGapMembers: this._drafts.presenceGapMembers,
           debugLogs: this._drafts.debugLogs,
           debugForceReactFallback: this._drafts.debugForceReactFallback,
         },
@@ -520,6 +683,42 @@ export class TWSESettingsPanel extends HTMLElement {
   set revivableIndicatorEnabled(val: boolean) {
     this._props.revivableIndicatorEnabled = val;
     this._drafts.revivableIndicatorEnabled = val;
+    this.render();
+  }
+
+  get presenceAlertsEnabled() {
+    return this._props.presenceAlertsEnabled;
+  }
+  set presenceAlertsEnabled(val: boolean) {
+    this._props.presenceAlertsEnabled = val;
+    this._drafts.presenceAlertsEnabled = val;
+    this.render();
+  }
+
+  get presenceSurgeMembers() {
+    return this._props.presenceSurgeMembers;
+  }
+  set presenceSurgeMembers(val: number) {
+    this._props.presenceSurgeMembers = val;
+    this._drafts.presenceSurgeMembers = val;
+    this.render();
+  }
+
+  get presenceSurgeWindowMin() {
+    return this._props.presenceSurgeWindowMin;
+  }
+  set presenceSurgeWindowMin(val: number) {
+    this._props.presenceSurgeWindowMin = val;
+    this._drafts.presenceSurgeWindowMin = val;
+    this.render();
+  }
+
+  get presenceGapMembers() {
+    return this._props.presenceGapMembers;
+  }
+  set presenceGapMembers(val: number) {
+    this._props.presenceGapMembers = val;
+    this._drafts.presenceGapMembers = val;
     this.render();
   }
 
@@ -595,6 +794,38 @@ export class TWSESettingsPanel extends HTMLElement {
   }
   set draftRevivableIndicatorEnabled(val: boolean) {
     this._drafts.revivableIndicatorEnabled = val;
+    this.render();
+  }
+
+  get draftPresenceAlertsEnabled() {
+    return this._drafts.presenceAlertsEnabled;
+  }
+  set draftPresenceAlertsEnabled(val: boolean) {
+    this._drafts.presenceAlertsEnabled = val;
+    this.render();
+  }
+
+  get draftPresenceSurgeMembers() {
+    return this._drafts.presenceSurgeMembers;
+  }
+  set draftPresenceSurgeMembers(val: number) {
+    this._drafts.presenceSurgeMembers = val;
+    this.render();
+  }
+
+  get draftPresenceSurgeWindowMin() {
+    return this._drafts.presenceSurgeWindowMin;
+  }
+  set draftPresenceSurgeWindowMin(val: number) {
+    this._drafts.presenceSurgeWindowMin = val;
+    this.render();
+  }
+
+  get draftPresenceGapMembers() {
+    return this._drafts.presenceGapMembers;
+  }
+  set draftPresenceGapMembers(val: number) {
+    this._drafts.presenceGapMembers = val;
     this.render();
   }
 

@@ -309,6 +309,26 @@ body:not(.twse-revivable-disabled)
   }
 }
 
+/* Presence alert (GLOSSARY.md): focus-gated like the unexpected-transition
+   highlight (ADR-0007) — detection keeps running while blurred, only the
+   flash is suppressed. */
+:root.twse-window-focused .twse-presence-online.twse-presence-alert {
+  background: #a3d900;
+  color: #111;
+  border-radius: 2px;
+  animation: twse-presence-pulse 1s infinite alternate;
+}
+
+@keyframes twse-presence-pulse {
+  from {
+    box-shadow: 0 0 2px rgba(163, 217, 0, 0.4);
+  }
+
+  to {
+    box-shadow: 0 0 8px rgba(163, 217, 0, 0.8);
+  }
+}
+
 /* ============================================================================
    TWSE Settings Panel Premium Aesthetic Styles & Body Visibility Toggles
    ============================================================================ */

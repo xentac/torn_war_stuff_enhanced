@@ -188,3 +188,112 @@ test("twse-settings-panel dispatches twse-clear-cache event on clear cache click
   expect(confirmMock).toHaveBeenCalled();
   expect(clearCacheEventMock).toHaveBeenCalledTimes(1);
 });
+
+function numberInput(el: TWSESettingsPanel, id: string): HTMLInputElement {
+  return el.querySelector(`#${id}`) as HTMLInputElement;
+}
+
+// React tracks a controlled input's value through the instance setter, so a
+// plain `input.value = ...` is invisible to onChange; go through the
+// prototype setter like a real keystroke would.
+function typeInto(input: HTMLInputElement, value: string) {
+  Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+test("twse-settings-panel renders Presence alert defaults and explanation", async () => {
+  const el = document.createElement("twse-settings-panel") as TWSESettingsPanel;
+  document.body.appendChild(el);
+  await el.updateComplete;
+
+  const toggle = el.querySelector(
+    "#twse-presence-alerts-toggle",
+  ) as HTMLInputElement;
+  expect(toggle).not.toBeNull();
+  expect(toggle.checked).toBe(true);
+
+  const surgeMembers = numberInput(el, "twse-presence-surge-members");
+  expect(surgeMembers.type).toBe("number");
+  expect(surgeMembers.value).toBe("5");
+  expect(surgeMembers.min).toBe("1");
+  expect(surgeMembers.max).toBe("50");
+  expect(surgeMembers.step).toBe("1");
+
+  const surgeWindow = numberInput(el, "twse-presence-surge-window-min");
+  expect(surgeWindow.value).toBe("5");
+  expect(surgeWindow.min).toBe("1");
+  expect(surgeWindow.max).toBe("30");
+
+  const gapMembers = numberInput(el, "twse-presence-gap-members");
+  expect(gapMembers.value).toBe("5");
+  expect(gapMembers.min).toBe("1");
+  expect(gapMembers.max).toBe("50");
+
+  const explanation = toggle
+    .closest(".input-row-inline")
+    ?.querySelector(".twse-api-explanation");
+  expect(explanation?.textContent).toMatch(/60 seconds/);
+  expect(explanation?.textContent).toMatch(/focused/);
+  expect(explanation?.textContent).toMatch(/not a guarantee/);
+});
+
+test("twse-settings-panel reflects Presence alert property changes", async () => {
+  const el = document.createElement("twse-settings-panel") as TWSESettingsPanel;
+  el.presenceAlertsEnabled = false;
+  el.presenceSurgeMembers = 12;
+  el.presenceSurgeWindowMin = 20;
+  el.presenceGapMembers = 3;
+  document.body.appendChild(el);
+  await el.updateComplete;
+
+  expect(
+    (el.querySelector("#twse-presence-alerts-toggle") as HTMLInputElement)
+      .checked,
+  ).toBe(false);
+  expect(numberInput(el, "twse-presence-surge-members").value).toBe("12");
+  expect(numberInput(el, "twse-presence-surge-window-min").value).toBe("20");
+  expect(numberInput(el, "twse-presence-gap-members").value).toBe("3");
+});
+
+test("twse-settings-panel updates Presence alert drafts and includes them in twse-save", async () => {
+  const el = document.createElement("twse-settings-panel") as TWSESettingsPanel;
+  document.body.appendChild(el);
+  await el.updateComplete;
+
+  (
+    el.querySelector("#twse-presence-alerts-toggle") as HTMLInputElement
+  ).click();
+  await el.updateComplete;
+  expect(el.draftPresenceAlertsEnabled).toBe(false);
+
+  const surgeMembers = numberInput(el, "twse-presence-surge-members");
+  typeInto(surgeMembers, "8");
+  await el.updateComplete;
+  expect(el.draftPresenceSurgeMembers).toBe(8);
+
+  const surgeWindow = numberInput(el, "twse-presence-surge-window-min");
+  typeInto(surgeWindow, "15");
+  await el.updateComplete;
+  expect(el.draftPresenceSurgeWindowMin).toBe(15);
+
+  // An emptied field is passed through as NaN; the config setter falls back
+  // to the default.
+  const gapMembers = numberInput(el, "twse-presence-gap-members");
+  typeInto(gapMembers, "");
+  await el.updateComplete;
+  expect(el.draftPresenceGapMembers).toBeNaN();
+  expect(gapMembers.value).toBe("");
+
+  const saveEventMock = vi.fn();
+  el.addEventListener("twse-save", saveEventMock);
+  (el.querySelector(".btn-save") as HTMLButtonElement).click();
+
+  const event = saveEventMock.mock.calls[0]?.[0] as CustomEvent;
+  expect(event.detail.presenceAlertsEnabled).toBe(false);
+  expect(event.detail.presenceSurgeMembers).toBe(8);
+  expect(event.detail.presenceSurgeWindowMin).toBe(15);
+  expect(event.detail.presenceGapMembers).toBeNaN();
+});
