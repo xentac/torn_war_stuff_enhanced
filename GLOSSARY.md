@@ -36,6 +36,15 @@ _Avoid_: Revival, revivable status
 **Presence**: A member's online/idle/offline indicator, read from the `aria-label` Torn writes on the member row's status icon (`"{name} is online|idle|offline"`) — sourced from the live DOM, like canonical status, rather than the Torn API, for freshness. Independent of canonical status: a hospitalized member can still be online.
 _Avoid_: online status (ambiguous with canonical "Okay"), activity state
 
+**Presence surge**: A faction's online count (online only — idle doesn't count) rising by at least a configured number of members above its lowest point within a configured trailing window. Measured from the trough, not from the window's start, so a dip followed by a rise counts in full. Clears on its own once the trough ages out of the window or members drop off. Applies to both factions with the same thresholds: an enemy surge suggests they may be gathering to push; an own-faction surge suggests an opportunity to push. History is per page load — a reload starts it fresh.
+_Avoid_: push warning, push detector (the script measures presence, not intent), spike
+
+**Presence gap**: The absolute difference between the two factions' online counts. It *crosses* when it reaches a configured member difference — including when it already exceeds that difference at page load — and *re-arms* only once it falls back to two below that difference, so a gap wobbling around the threshold doesn't re-fire.
+_Avoid_: online advantage, push window
+
+**Presence alert**: The flash on a faction's online count in the chain bubble, raised either by a Presence surge on that faction or by that faction being the leading side of a Presence gap crossing. One shared visual for both causes. A gap-triggered alert lasts a fixed time from the crossing; a surge-triggered alert lasts as long as the surge holds. Focus-gated like the unexpected-transition highlight (ADR-0007): an alert that fires and ends while the window is unfocused is never seen.
+_Avoid_: push warning, presence flash, threshold flash
+
 ### Sort model
 
 **Sort group**: The category that places a member's row ahead of or behind other rows in the member list, before any within-group tie-break is applied. The member list orders by sort group first: unexpected transitions, then Tier B, then hospitalized/jailed, then the incoming/abroad/outgoing/traveling sub-groups. Tier A and Tier B are the two sort groups used within the Okay section; the remaining sort groups order non-Okay states.

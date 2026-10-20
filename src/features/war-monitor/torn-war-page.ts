@@ -59,7 +59,7 @@ const PRESENCE_SUFFIXES: [suffix: string, presence: Presence][] = [
 /**
  * A member row's online/idle/offline presence, read from the aria-label Torn
  * writes on the row's status icon ("{name} is online|idle|offline") -
- * independent of canonical status (CONTEXT.md "Presence"), sourced directly
+ * independent of canonical status (GLOSSARY.md "Presence"), sourced directly
  * from the live DOM rather than the Torn API for freshness. Checks every
  * aria-label-bearing descendant (not just the first) since the row also
  * carries unrelated aria-labels (faction tag, profile link, honor badge).

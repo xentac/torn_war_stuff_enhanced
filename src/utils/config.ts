@@ -175,7 +175,7 @@ export class Config {
 
   /**
    * Checks whether the revivable-plus indicator (the red/purple "+" over a
-   * member's status, per CONTEXT.md) is shown. Gates it uniformly across
+   * member's status, per GLOSSARY.md) is shown. Gates it uniformly across
    * both sides of the war and all canonical states.
    */
   get revivable_indicator_enabled(): boolean {

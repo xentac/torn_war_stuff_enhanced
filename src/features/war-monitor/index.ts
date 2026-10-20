@@ -204,7 +204,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
         WarMonitorFeature.intervals.minTimeBetweenRequests;
 
       const activeChains = new Map<string, ActiveChainState>();
-      // Presence (CONTEXT.md) tallies per faction, rebuilt each watch() tick
+      // Presence (GLOSSARY.md) tallies per faction, rebuilt each watch() tick
       // as a side effect of the per-member walk that function already does —
       // read here by updateChainBubble rather than re-querying the DOM.
       let presenceCounts = new Map<string, PresenceCounts>();
@@ -546,7 +546,7 @@ const WarMonitorFeature: WarMonitorFeatureType = {
       }
 
       // Builds the "Name - Stat estimate - Attack link" rich copy content
-      // (see CONTEXT.md's Total stat estimate entry). The stat estimate
+      // (see GLOSSARY.md's Total stat estimate entry). The stat estimate
       // segment is omitted whenever data-est-value doesn't parse to a finite
       // positive number: absent (FF Scouter not installed), "" (FF Scouter
       // installed but has no data for this player yet), or garbage all fall

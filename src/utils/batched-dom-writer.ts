@@ -2,7 +2,7 @@ type DeferredAttrWrite = [Element, string, string];
 type DeferredStyleWrite = [HTMLElement, string, string];
 
 export interface BatchedDomWriterConfig {
-  /** Group name -> attribute names that belong to it (CONTEXT.md vocabulary
+  /** Group name -> attribute names that belong to it (GLOSSARY.md vocabulary
    * is up to the caller — this class has no domain knowledge of its own). */
   groups: Record<string, string[]>;
 }
