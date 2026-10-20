@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced Beta
 // @namespace    namespace-beta
-// @version      2.2-beta3
+// @version      2.2-beta4
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -222,6 +222,25 @@ clearAll() {
       }
     }
   }
+  const PRESENCE_SURGE_MEMBERS_RANGE = {
+    min: 1,
+    max: 50,
+    default: 5
+  };
+  const PRESENCE_SURGE_WINDOW_MIN_RANGE = {
+    min: 1,
+    max: 30,
+    default: 5
+  };
+  const PRESENCE_GAP_MEMBERS_RANGE = {
+    min: 1,
+    max: 50,
+    default: 5
+  };
+  function clampInt(val, range) {
+    if (typeof val !== "number" || !Number.isFinite(val)) return range.default;
+    return Math.min(range.max, Math.max(range.min, Math.round(val)));
+  }
   class Config {
     constructor(prefix = "twse-config-") {
       this.legacyPrefix = "xentac-torn_war_stuff_enhanced-";
@@ -332,6 +351,56 @@ get revivable_indicator_enabled() {
     set revivable_indicator_enabled(val) {
       this.storage.set("revivable_indicator_enabled", val);
     }
+get presence_alerts_enabled() {
+      return this.storage.get(
+        "presence_alerts_enabled"
+) ?? true;
+    }
+    set presence_alerts_enabled(val) {
+      this.storage.set("presence_alerts_enabled", val);
+    }
+get presence_surge_members() {
+      return clampInt(
+        this.storage.get(
+          "presence_surge_members"
+),
+        PRESENCE_SURGE_MEMBERS_RANGE
+      );
+    }
+    set presence_surge_members(val) {
+      this.storage.set(
+        "presence_surge_members",
+        clampInt(val, PRESENCE_SURGE_MEMBERS_RANGE)
+      );
+    }
+get presence_surge_window_min() {
+      return clampInt(
+        this.storage.get(
+          "presence_surge_window_min"
+),
+        PRESENCE_SURGE_WINDOW_MIN_RANGE
+      );
+    }
+    set presence_surge_window_min(val) {
+      this.storage.set(
+        "presence_surge_window_min",
+        clampInt(val, PRESENCE_SURGE_WINDOW_MIN_RANGE)
+      );
+    }
+get presence_gap_members() {
+      return clampInt(
+        this.storage.get(
+          "presence_gap_members"
+),
+        PRESENCE_GAP_MEMBERS_RANGE
+      );
+    }
+    set presence_gap_members(val) {
+      this.storage.set(
+        "presence_gap_members",
+        clampInt(val, PRESENCE_GAP_MEMBERS_RANGE)
+      );
+    }
 reset() {
       this.storage.remove(
         "debug_logs"
@@ -362,6 +431,18 @@ reset() {
 );
       this.storage.remove(
         "revivable_indicator_enabled"
+);
+      this.storage.remove(
+        "presence_alerts_enabled"
+);
+      this.storage.remove(
+        "presence_surge_members"
+);
+      this.storage.remove(
+        "presence_surge_window_min"
+);
+      this.storage.remove(
+        "presence_gap_members"
 );
     }
   }
@@ -504,6 +585,7 @@ reset() {
     return requiredReact().ReactDOM;
   }
   const FRAGMENT_SENTINEL = Symbol("ReactFragment");
+  const Fragment = FRAGMENT_SENTINEL;
   function jsx(type, { children, ...props }, key) {
     const R = getReact();
     const createElement2 = R.createElement;
@@ -564,6 +646,10 @@ reset() {
     copyFormat: "name_id",
     twseServerEnabled: true,
     revivableIndicatorEnabled: true,
+    presenceAlertsEnabled: true,
+    presenceSurgeMembers: PRESENCE_SURGE_MEMBERS_RANGE.default,
+    presenceSurgeWindowMin: PRESENCE_SURGE_WINDOW_MIN_RANGE.default,
+    presenceGapMembers: PRESENCE_GAP_MEMBERS_RANGE.default,
     debugLogs: false,
     debugForceReactFallback: false
   };
@@ -579,6 +665,10 @@ reset() {
     onCopyFormatDraftChange,
     onTwseServerEnabledDraftChange,
     onRevivableIndicatorEnabledDraftChange,
+    onPresenceAlertsEnabledDraftChange,
+    onPresenceSurgeMembersDraftChange,
+    onPresenceSurgeWindowMinDraftChange,
+    onPresenceGapMembersDraftChange,
     onDebugLogsDraftChange,
     onDebugForceReactFallbackDraftChange,
     onSave,
@@ -688,6 +778,16 @@ jsx(
           ),
 jsx("label", { htmlFor: "twse-revivable-indicator-toggle", children: "Show revivable-plus indicator (red/purple + over status)" })
         ] }),
+jsx(
+          PresenceAlertsSettings,
+          {
+            drafts,
+            onPresenceAlertsEnabledDraftChange,
+            onPresenceSurgeMembersDraftChange,
+            onPresenceSurgeWindowMinDraftChange,
+            onPresenceGapMembersDraftChange
+          }
+        ),
 jsx("h3", { children: "Community Data Sharing:" }),
 jsxs("div", { className: "input-row-inline", children: [
 jsx(
@@ -781,6 +881,88 @@ jsx(
       ] })
     ] });
   }
+  function PresenceAlertsSettings({
+    drafts,
+    onPresenceAlertsEnabledDraftChange,
+    onPresenceSurgeMembersDraftChange,
+    onPresenceSurgeWindowMinDraftChange,
+    onPresenceGapMembersDraftChange
+  }) {
+    return jsxs(Fragment, { children: [
+jsx("h3", { children: "Presence Alerts:" }),
+jsxs("div", { className: "input-row-inline", children: [
+jsx(
+          "input",
+          {
+            id: "twse-presence-alerts-toggle",
+            type: "checkbox",
+            checked: drafts.presenceAlertsEnabled,
+            onChange: (e) => onPresenceAlertsEnabledDraftChange(
+              e.target.checked
+            )
+          }
+        ),
+jsx("label", { htmlFor: "twse-presence-alerts-toggle", children: "Flash a faction's online count in the chain bubble on a presence surge or gap" }),
+jsxs("div", { className: "twse-api-explanation", children: [
+jsx("strong", { children: "Info:" }),
+          " A faction's online count (idle doesn't count) flashes while it has gained at least the surge number of online members within the surge window (a presence surge). When one side has at least the gap number more members online than the other, the side ahead flashes for 60 seconds (a presence gap), and won't flash again until the difference drops to the gap number minus two or less. Flashes only show while this window is focused. This is a presence signal, not a guarantee of a push."
+        ] })
+      ] }),
+jsx(
+        NumberSetting,
+        {
+          id: "twse-presence-surge-members",
+          label: "Surge: members",
+          range: PRESENCE_SURGE_MEMBERS_RANGE,
+          value: drafts.presenceSurgeMembers,
+          onChange: onPresenceSurgeMembersDraftChange
+        }
+      ),
+jsx(
+        NumberSetting,
+        {
+          id: "twse-presence-surge-window-min",
+          label: "Surge: window, minutes",
+          range: PRESENCE_SURGE_WINDOW_MIN_RANGE,
+          value: drafts.presenceSurgeWindowMin,
+          onChange: onPresenceSurgeWindowMinDraftChange
+        }
+      ),
+jsx(
+        NumberSetting,
+        {
+          id: "twse-presence-gap-members",
+          label: "Gap: members",
+          range: PRESENCE_GAP_MEMBERS_RANGE,
+          value: drafts.presenceGapMembers,
+          onChange: onPresenceGapMembersDraftChange
+        }
+      )
+    ] });
+  }
+  function NumberSetting({
+    id,
+    label,
+    range,
+    value,
+    onChange
+  }) {
+    return jsxs("div", { className: "input-row-inline", children: [
+jsx("label", { htmlFor: id, children: label }),
+jsx(
+        "input",
+        {
+          id,
+          type: "number",
+          min: range.min,
+          max: range.max,
+          step: 1,
+          value: Number.isNaN(value) ? "" : value,
+          onChange: (e) => onChange(e.target.valueAsNumber)
+        }
+      )
+    ] });
+  }
   class TWSESettingsPanel extends HTMLElement {
     constructor() {
       super();
@@ -812,6 +994,10 @@ jsx(
         copyFormat: this._props.copyFormat,
         twseServerEnabled: this._props.twseServerEnabled,
         revivableIndicatorEnabled: this._props.revivableIndicatorEnabled,
+        presenceAlertsEnabled: this._props.presenceAlertsEnabled,
+        presenceSurgeMembers: this._props.presenceSurgeMembers,
+        presenceSurgeWindowMin: this._props.presenceSurgeWindowMin,
+        presenceGapMembers: this._props.presenceGapMembers,
         debugLogs: this._props.debugLogs,
         debugForceReactFallback: this._props.debugForceReactFallback
       };
@@ -870,6 +1056,26 @@ jsx(
           },
           onRevivableIndicatorEnabledDraftChange: (val) => {
             this._drafts.revivableIndicatorEnabled = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onPresenceAlertsEnabledDraftChange: (val) => {
+            this._drafts.presenceAlertsEnabled = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onPresenceSurgeMembersDraftChange: (val) => {
+            this._drafts.presenceSurgeMembers = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onPresenceSurgeWindowMinDraftChange: (val) => {
+            this._drafts.presenceSurgeWindowMin = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onPresenceGapMembersDraftChange: (val) => {
+            this._drafts.presenceGapMembers = val;
             this._showSavedMessage = false;
             this.render();
           },
@@ -934,6 +1140,10 @@ jsx(
             copyFormat: this._drafts.copyFormat,
             twseServerEnabled: this._drafts.twseServerEnabled,
             revivableIndicatorEnabled: this._drafts.revivableIndicatorEnabled,
+            presenceAlertsEnabled: this._drafts.presenceAlertsEnabled,
+            presenceSurgeMembers: this._drafts.presenceSurgeMembers,
+            presenceSurgeWindowMin: this._drafts.presenceSurgeWindowMin,
+            presenceGapMembers: this._drafts.presenceGapMembers,
             debugLogs: this._drafts.debugLogs,
             debugForceReactFallback: this._drafts.debugForceReactFallback
           },
@@ -996,6 +1206,38 @@ get apiKey() {
     set revivableIndicatorEnabled(val) {
       this._props.revivableIndicatorEnabled = val;
       this._drafts.revivableIndicatorEnabled = val;
+      this.render();
+    }
+    get presenceAlertsEnabled() {
+      return this._props.presenceAlertsEnabled;
+    }
+    set presenceAlertsEnabled(val) {
+      this._props.presenceAlertsEnabled = val;
+      this._drafts.presenceAlertsEnabled = val;
+      this.render();
+    }
+    get presenceSurgeMembers() {
+      return this._props.presenceSurgeMembers;
+    }
+    set presenceSurgeMembers(val) {
+      this._props.presenceSurgeMembers = val;
+      this._drafts.presenceSurgeMembers = val;
+      this.render();
+    }
+    get presenceSurgeWindowMin() {
+      return this._props.presenceSurgeWindowMin;
+    }
+    set presenceSurgeWindowMin(val) {
+      this._props.presenceSurgeWindowMin = val;
+      this._drafts.presenceSurgeWindowMin = val;
+      this.render();
+    }
+    get presenceGapMembers() {
+      return this._props.presenceGapMembers;
+    }
+    set presenceGapMembers(val) {
+      this._props.presenceGapMembers = val;
+      this._drafts.presenceGapMembers = val;
       this.render();
     }
     get debugLogs() {
@@ -1063,6 +1305,34 @@ get draftApiKey() {
       this._drafts.revivableIndicatorEnabled = val;
       this.render();
     }
+    get draftPresenceAlertsEnabled() {
+      return this._drafts.presenceAlertsEnabled;
+    }
+    set draftPresenceAlertsEnabled(val) {
+      this._drafts.presenceAlertsEnabled = val;
+      this.render();
+    }
+    get draftPresenceSurgeMembers() {
+      return this._drafts.presenceSurgeMembers;
+    }
+    set draftPresenceSurgeMembers(val) {
+      this._drafts.presenceSurgeMembers = val;
+      this.render();
+    }
+    get draftPresenceSurgeWindowMin() {
+      return this._drafts.presenceSurgeWindowMin;
+    }
+    set draftPresenceSurgeWindowMin(val) {
+      this._drafts.presenceSurgeWindowMin = val;
+      this.render();
+    }
+    get draftPresenceGapMembers() {
+      return this._drafts.presenceGapMembers;
+    }
+    set draftPresenceGapMembers(val) {
+      this._drafts.presenceGapMembers = val;
+      this.render();
+    }
     get draftDebugLogs() {
       return this._drafts.debugLogs;
     }
@@ -1103,6 +1373,10 @@ get draftApiKey() {
       panel.copyFormat = twseconfig.copy_format;
       panel.twseServerEnabled = twseconfig.twse_server_enabled;
       panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+      panel.presenceAlertsEnabled = twseconfig.presence_alerts_enabled;
+      panel.presenceSurgeMembers = twseconfig.presence_surge_members;
+      panel.presenceSurgeWindowMin = twseconfig.presence_surge_window_min;
+      panel.presenceGapMembers = twseconfig.presence_gap_members;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
       panel.addEventListener("twse-save", (e) => {
@@ -1114,8 +1388,15 @@ get draftApiKey() {
         twseconfig.copy_format = detail.copyFormat;
         twseconfig.twse_server_enabled = detail.twseServerEnabled;
         twseconfig.revivable_indicator_enabled = detail.revivableIndicatorEnabled;
+        twseconfig.presence_alerts_enabled = detail.presenceAlertsEnabled;
+        twseconfig.presence_surge_members = detail.presenceSurgeMembers;
+        twseconfig.presence_surge_window_min = detail.presenceSurgeWindowMin;
+        twseconfig.presence_gap_members = detail.presenceGapMembers;
         twseconfig.debug_logs = detail.debugLogs;
         twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
+        panel.presenceSurgeMembers = twseconfig.presence_surge_members;
+        panel.presenceSurgeWindowMin = twseconfig.presence_surge_window_min;
+        panel.presenceGapMembers = twseconfig.presence_gap_members;
         log$5.info("Settings saved successfully");
         window.dispatchEvent(new CustomEvent("twse-config-updated"));
       });
@@ -1128,6 +1409,10 @@ get draftApiKey() {
         panel.copyFormat = twseconfig.copy_format;
         panel.twseServerEnabled = twseconfig.twse_server_enabled;
         panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+        panel.presenceAlertsEnabled = twseconfig.presence_alerts_enabled;
+        panel.presenceSurgeMembers = twseconfig.presence_surge_members;
+        panel.presenceSurgeWindowMin = twseconfig.presence_surge_window_min;
+        panel.presenceGapMembers = twseconfig.presence_gap_members;
         panel.debugLogs = twseconfig.debug_logs;
         panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
         log$5.info("Settings reset to defaults");
@@ -1548,7 +1833,7 @@ submit(factionId, payload) {
     }
   }
   const twseClient = new TwseServerClient();
-  const stylesCss = '.members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone],body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]{position:relative!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before,body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{content:"+";position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:800;line-height:1}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before{color:#ef4444!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{color:#a06bf0!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}.twse-chain-presence{font-family:monospace;color:#bbb}.twse-presence-online{color:#a3d900}.twse-presence-idle{color:#ffbf00}.twse-presence-offline{color:#ccc}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}';
+  const stylesCss = '.members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone],body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]{position:relative!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before,body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{content:"+";position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:800;line-height:1}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before{color:#ef4444!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{color:#a06bf0!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}.twse-chain-presence{font-family:monospace;color:#bbb}.twse-presence-online{color:#a3d900}.twse-presence-idle{color:#ffbf00}.twse-presence-offline{color:#ccc}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}:root.twse-window-focused .twse-presence-online.twse-presence-alert{background:#a3d900;color:#111;border-radius:2px;animation:twse-presence-pulse 1s infinite alternate}@keyframes twse-presence-pulse{0%{box-shadow:0 0 2px #a3d90066}to{box-shadow:0 0 8px #a3d900cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}';
   importCSS(stylesCss);
   var SortGroup = ((SortGroup2) => {
     SortGroup2["UnexpectedOkay"] = "UnexpectedOkay";
@@ -1710,6 +1995,51 @@ submit(factionId, payload) {
   }
   function isUnexpectedHighlighted(transitionState, browserNow, config) {
     return transitionState.unexpectedSince !== null && browserNow - transitionState.unexpectedSince < config.unexpectedHighlightMs;
+  }
+  const PRESENCE_GAP_ALERT_MS = 6e4;
+  class PresenceAlertTracker {
+    constructor() {
+      this.samples = new Map();
+      this.gapArmed = true;
+      this.gapLeader = null;
+      this.gapAlertUntil = 0;
+    }
+    update(nowMs, onlineByFaction, settings) {
+      const alerting = new Set();
+      for (const [factionId, online] of onlineByFaction) {
+        const samples = this.samples.get(factionId) ?? [];
+        samples.push({ t: nowMs, online });
+        const cutoff = nowMs - settings.surgeWindowMs;
+        while (samples.length > 0 && (samples[0]?.t ?? nowMs) < cutoff) {
+          samples.shift();
+        }
+        this.samples.set(factionId, samples);
+        const trough = Math.min(...samples.map((s) => s.online));
+        if (online - trough >= settings.surgeMembers) {
+          alerting.add(factionId);
+        }
+      }
+      this.updateGap(nowMs, onlineByFaction, settings.gapMembers);
+      if (this.gapLeader !== null && nowMs < this.gapAlertUntil) {
+        alerting.add(this.gapLeader);
+      }
+      return alerting;
+    }
+    updateGap(nowMs, onlineByFaction, gapMembers) {
+      if (onlineByFaction.size !== 2) return;
+      const [[idA, onlineA], [idB, onlineB]] = [...onlineByFaction];
+      const gap = Math.abs(onlineA - onlineB);
+      const leader = onlineA > onlineB ? idA : onlineB > onlineA ? idB : null;
+      if (gap >= gapMembers) {
+        if (this.gapArmed || leader !== this.gapLeader) {
+          this.gapArmed = false;
+          this.gapLeader = leader;
+          this.gapAlertUntil = nowMs + PRESENCE_GAP_ALERT_MS;
+        }
+      } else if (gap <= Math.max(0, gapMembers - 2)) {
+        this.gapArmed = true;
+      }
+    }
   }
   function getMemberLists() {
     return Array.from(document.querySelectorAll("ul.members-list"));
@@ -1893,6 +2223,8 @@ submit(factionId, payload) {
         const minTimeBetweenRequestsMs = WarMonitorFeature.intervals.minTimeBetweenRequests;
         const activeChains = new Map();
         let presenceCounts = new Map();
+        let presenceAlertTracker = new PresenceAlertTracker();
+        let presenceAlertFactions = new Set();
         const lastAppliedTimestamp = new Map();
         let cachedUserIdHashKey = null;
         let cachedUserIdHash = null;
@@ -1918,6 +2250,8 @@ submit(factionId, payload) {
           unexpectedTransitions.clear();
           okaySinceTimestamps.clear();
           lastAppliedTimestamp.clear();
+          presenceAlertTracker = new PresenceAlertTracker();
+          presenceAlertFactions = new Set();
           updateStatuses();
         };
         window.addEventListener("twse-clear-cache", onClearCache);
@@ -2622,16 +2956,31 @@ submit(factionId, payload) {
             }
           }
           presenceCounts = nextPresenceCounts;
+          presenceAlertFactions = twseconfig.presence_alerts_enabled ? presenceAlertTracker.update(
+            getCurrentTime(),
+            new Map(
+              Array.from(presenceCounts, ([factionId, tally]) => [
+                factionId,
+                tally.online
+              ])
+            ),
+            {
+              surgeMembers: twseconfig.presence_surge_members,
+              surgeWindowMs: twseconfig.presence_surge_window_min * 6e4,
+              gapMembers: twseconfig.presence_gap_members
+            }
+          ) : new Set();
           updateChainBubble();
         }
         function formatPresenceSlot(count) {
           const text = count === null ? "-" : String(count);
           return text.padStart(2, " ");
         }
-        function formatPresenceSlotHtml(presence, count) {
+        function formatPresenceSlotHtml(presence, count, alert2 = false) {
           const text = formatPresenceSlot(count);
           if (count === null) return text;
-          return `<span class="twse-presence-${presence}">${text}</span>`;
+          const alertClass = alert2 ? " twse-presence-alert" : "";
+          return `<span class="twse-presence-${presence}${alertClass}">${text}</span>`;
         }
         function updateChainBubble() {
           if (!bubbleContainer || isDragging) return;
@@ -2673,7 +3022,11 @@ submit(factionId, payload) {
             }
             const presence = presenceCounts.get(factionId);
             const presenceText = [
-              formatPresenceSlotHtml("online", presence?.online ?? null),
+              formatPresenceSlotHtml(
+                "online",
+                presence?.online ?? null,
+                presenceAlertFactions.has(factionId)
+              ),
               formatPresenceSlotHtml("idle", presence?.idle ?? null),
               formatPresenceSlotHtml("offline", presence?.offline ?? null)
             ].join("/");
