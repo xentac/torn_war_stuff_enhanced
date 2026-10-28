@@ -148,6 +148,10 @@ const WarMonitorFeature: WarMonitorFeatureType = {
           !twseconfig.bubble_enabled,
         );
         document.body.classList.toggle(
+          "twse-presence-disabled",
+          !twseconfig.bubble_presence_enabled,
+        );
+        document.body.classList.toggle(
           "twse-revivable-disabled",
           !twseconfig.revivable_indicator_enabled,
         );

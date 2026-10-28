@@ -320,6 +320,9 @@ body.twse-copy-disabled .twse-copy-btn {
 body.twse-bubble-disabled #twse-chain-bubble {
   display: none !important;
 }
+body.twse-presence-disabled #twse-chain-bubble .twse-chain-presence {
+  display: none !important;
+}
 
 body {
   --twse-bg-color: #f0f0f0;
@@ -392,6 +395,16 @@ twse-settings-panel .input-row-inline input[type="checkbox"] {
 twse-settings-panel .input-row-inline label {
   cursor: pointer;
   line-height: 1.4;
+}
+
+twse-settings-panel .input-row-inline.twse-sub-setting {
+  margin-left: 24px;
+}
+
+twse-settings-panel .input-row-inline input[type="checkbox"]:disabled,
+twse-settings-panel .input-row-inline input[type="checkbox"]:disabled + label {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 twse-settings-panel .blur-mode {

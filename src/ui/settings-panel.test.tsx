@@ -34,6 +34,13 @@ test("twse-settings-panel renders defaults correctly", async () => {
   expect(bubbleCheckbox).not.toBeNull();
   expect(bubbleCheckbox.checked).toBe(true);
 
+  const bubblePresenceCheckbox = el.querySelector(
+    "#twse-chain-bubble-presence-toggle",
+  ) as HTMLInputElement;
+  expect(bubblePresenceCheckbox).not.toBeNull();
+  expect(bubblePresenceCheckbox.checked).toBe(true);
+  expect(bubblePresenceCheckbox.disabled).toBe(false);
+
   const twseServerCheckbox = el.querySelector(
     "#twse-server-enabled",
   ) as HTMLInputElement;
@@ -52,6 +59,7 @@ test("twse-settings-panel reflects property changes dynamically", async () => {
   el.apiKey = "1234567890123456";
   el.warSorting = false;
   el.bubbleEnabled = false;
+  el.bubblePresenceEnabled = false;
   el.twseServerEnabled = false;
   el.revivableIndicatorEnabled = false;
 
@@ -70,6 +78,11 @@ test("twse-settings-panel reflects property changes dynamically", async () => {
     "#twse-chain-bubble-toggle",
   ) as HTMLInputElement;
   expect(bubbleCheckbox.checked).toBe(false);
+
+  const bubblePresenceCheckbox = el.querySelector(
+    "#twse-chain-bubble-presence-toggle",
+  ) as HTMLInputElement;
+  expect(bubblePresenceCheckbox.checked).toBe(false);
 
   const twseServerCheckbox = el.querySelector(
     "#twse-server-enabled",
@@ -143,6 +156,46 @@ test("twse-settings-panel dispatches twse-save event on save button click", asyn
   expect(event.detail.warSorting).toBe(true);
   expect(event.detail.twseServerEnabled).toBe(true);
   expect(event.detail.revivableIndicatorEnabled).toBe(true);
+  expect(event.detail.bubblePresenceEnabled).toBe(true);
+});
+
+test("twse-settings-panel greys out the presence counts sub-setting while the bubble draft is off, keeping its value", async () => {
+  const el = document.createElement("twse-settings-panel") as TWSESettingsPanel;
+  document.body.appendChild(el);
+  await el.updateComplete;
+
+  const saveEventMock = vi.fn();
+  el.addEventListener("twse-save", saveEventMock);
+
+  const presenceCheckbox = el.querySelector(
+    "#twse-chain-bubble-presence-toggle",
+  ) as HTMLInputElement;
+  presenceCheckbox.click();
+  await el.updateComplete;
+  expect(el.draftBubblePresenceEnabled).toBe(false);
+
+  const bubbleCheckbox = el.querySelector(
+    "#twse-chain-bubble-toggle",
+  ) as HTMLInputElement;
+  bubbleCheckbox.click();
+  await el.updateComplete;
+
+  expect(el.draftBubbleEnabled).toBe(false);
+  expect(presenceCheckbox.disabled).toBe(true);
+  expect(presenceCheckbox.checked).toBe(false);
+
+  const saveButton = el.querySelector(".btn-save") as HTMLButtonElement;
+  saveButton.click();
+
+  const event = saveEventMock.mock.calls[0]?.[0] as CustomEvent;
+  expect(event.detail.bubbleEnabled).toBe(false);
+  expect(event.detail.bubblePresenceEnabled).toBe(false);
+
+  bubbleCheckbox.click();
+  await el.updateComplete;
+
+  expect(presenceCheckbox.disabled).toBe(false);
+  expect(presenceCheckbox.checked).toBe(false);
 });
 
 test("twse-settings-panel dispatches twse-reset event on reset button click", async () => {

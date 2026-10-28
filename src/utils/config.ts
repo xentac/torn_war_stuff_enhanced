@@ -9,6 +9,7 @@ enum CONFIG_KEYS {
   BUBBLE_POSITION = "bubble_position",
   BUBBLE_MINIMIZED = "bubble_minimized",
   BUBBLE_ENABLED = "bubble_enabled",
+  BUBBLE_PRESENCE_ENABLED = "bubble_presence_enabled",
   COPY_BUTTON_ENABLED = "copy_button_enabled",
   COPY_FORMAT = "copy_format",
   TWSE_SERVER_ENABLED = "twse_server_enabled",
@@ -139,6 +140,21 @@ export class Config {
   }
 
   /**
+   * Checks whether the chain bubble shows each faction's online/idle/offline
+   * Presence counts (CONTEXT.md "Chain bubble"). A sub-setting of
+   * bubble_enabled, hidden on every row together so the bubble narrows.
+   */
+  get bubble_presence_enabled(): boolean {
+    return (
+      this.storage.get<boolean>(CONFIG_KEYS.BUBBLE_PRESENCE_ENABLED) ?? true
+    );
+  }
+
+  set bubble_presence_enabled(val: boolean) {
+    this.storage.set(CONFIG_KEYS.BUBBLE_PRESENCE_ENABLED, val);
+  }
+
+  /**
    * Checks whether the player name copy to clipboard button is enabled.
    */
   get copy_button_enabled(): boolean {
@@ -198,6 +214,7 @@ export class Config {
     this.storage.remove(CONFIG_KEYS.BUBBLE_POSITION);
     this.storage.remove(CONFIG_KEYS.BUBBLE_MINIMIZED);
     this.storage.remove(CONFIG_KEYS.BUBBLE_ENABLED);
+    this.storage.remove(CONFIG_KEYS.BUBBLE_PRESENCE_ENABLED);
     this.storage.remove(CONFIG_KEYS.COPY_BUTTON_ENABLED);
     this.storage.remove(CONFIG_KEYS.COPY_FORMAT);
     this.storage.remove(CONFIG_KEYS.TWSE_SERVER_ENABLED);

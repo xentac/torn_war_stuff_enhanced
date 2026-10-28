@@ -1341,6 +1341,7 @@ describe("WarMonitorFeature Sorting Config", () => {
       localStorage.clear();
       documentMock.body = new MockElement("body");
       twseconfig.bubble_enabled = true;
+      twseconfig.bubble_presence_enabled = true;
       twseconfig.copy_button_enabled = true;
       twseconfig.revivable_indicator_enabled = true;
 
@@ -1368,6 +1369,9 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       // Initial state: default true meaning no disabled class
       expect(documentMock.body.className).not.toContain("twse-bubble-disabled");
+      expect(documentMock.body.className).not.toContain(
+        "twse-presence-disabled",
+      );
       expect(documentMock.body.className).not.toContain("twse-copy-disabled");
       expect(documentMock.body.className).not.toContain(
         "twse-revivable-disabled",
@@ -1375,6 +1379,7 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       // Toggle configurations
       twseconfig.bubble_enabled = false;
+      twseconfig.bubble_presence_enabled = false;
       twseconfig.copy_button_enabled = false;
       twseconfig.revivable_indicator_enabled = false;
 
@@ -1383,16 +1388,21 @@ describe("WarMonitorFeature Sorting Config", () => {
 
       // Verify that classes are correctly updated
       expect(documentMock.body.className).toContain("twse-bubble-disabled");
+      expect(documentMock.body.className).toContain("twse-presence-disabled");
       expect(documentMock.body.className).toContain("twse-copy-disabled");
       expect(documentMock.body.className).toContain("twse-revivable-disabled");
 
       // Toggle them back
       twseconfig.bubble_enabled = true;
+      twseconfig.bubble_presence_enabled = true;
       twseconfig.copy_button_enabled = true;
       twseconfig.revivable_indicator_enabled = true;
       window.dispatchEvent(new Event("twse-config-updated"));
 
       expect(documentMock.body.className).not.toContain("twse-bubble-disabled");
+      expect(documentMock.body.className).not.toContain(
+        "twse-presence-disabled",
+      );
       expect(documentMock.body.className).not.toContain("twse-copy-disabled");
       expect(documentMock.body.className).not.toContain(
         "twse-revivable-disabled",

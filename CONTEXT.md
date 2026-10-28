@@ -36,6 +36,9 @@ _Avoid_: Revival, revivable status
 **Presence**: A member's online/idle/offline indicator, read from the `aria-label` Torn writes on the member row's status icon (`"{name} is online|idle|offline"`) — sourced from the live DOM, like canonical status, rather than the Torn API, for freshness. Independent of canonical status: a hospitalized member can still be online.
 _Avoid_: online status (ambiguous with canonical "Okay"), activity state
 
+**Chain bubble**: The floating, draggable panel with one row per faction that has an active chain. Each row shows the chain count, multiplier, chain timer, and the faction's online/idle/offline Presence counts. Gated by the `bubble_enabled` Settings Panel toggle (default on). The Presence counts have their own sub-setting, `bubble_presence_enabled` (default on). If it is disabled, the counts are hidden on every row together, not per faction, so the bubble is narrower on small screens.
+_Avoid_: chain box, chain widget, floating bubble
+
 ### Sort model
 
 **Sort group**: The category that places a member's row ahead of or behind other rows in the member list, before any within-group tie-break is applied. The member list orders by sort group first: unexpected transitions, then Tier B, then hospitalized/jailed, then the incoming/abroad/outgoing/traveling sub-groups. Tier A and Tier B are the two sort groups used within the Okay section; the remaining sort groups order non-Okay states.

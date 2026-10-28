@@ -6,6 +6,7 @@ const DEFAULT_VALUES = {
   apiKey: "",
   warSorting: true,
   bubbleEnabled: true,
+  bubblePresenceEnabled: true,
   copyButtonEnabled: true,
   copyFormat: "name_id" as CopyFormat,
   twseServerEnabled: true,
@@ -22,6 +23,7 @@ type SettingsPanelComponentProps = {
   onApiKeyCommit: (val: string) => void;
   onWarSortingDraftChange: (val: boolean) => void;
   onBubbleEnabledDraftChange: (val: boolean) => void;
+  onBubblePresenceEnabledDraftChange: (val: boolean) => void;
   onCopyButtonEnabledDraftChange: (val: boolean) => void;
   onCopyFormatDraftChange: (val: CopyFormat) => void;
   onTwseServerEnabledDraftChange: (val: boolean) => void;
@@ -42,6 +44,7 @@ export function SettingsPanelComponent({
   onApiKeyCommit,
   onWarSortingDraftChange,
   onBubbleEnabledDraftChange,
+  onBubblePresenceEnabledDraftChange,
   onCopyButtonEnabledDraftChange,
   onCopyFormatDraftChange,
   onTwseServerEnabledDraftChange,
@@ -121,6 +124,25 @@ export function SettingsPanelComponent({
           <label htmlFor="twse-chain-bubble-toggle">
             Show Floating Chain Bubble (displays real-time countdown of your
             faction's chain)
+          </label>
+        </div>
+
+        {/* Chain bubble presence counts sub-setting (greyed out while the
+            bubble itself is off; its own value is kept either way) */}
+        <div className="input-row-inline twse-sub-setting">
+          <input
+            id="twse-chain-bubble-presence-toggle"
+            type="checkbox"
+            checked={drafts.bubblePresenceEnabled}
+            disabled={!drafts.bubbleEnabled}
+            onChange={(e) =>
+              onBubblePresenceEnabledDraftChange(
+                (e.target as HTMLInputElement).checked,
+              )
+            }
+          />
+          <label htmlFor="twse-chain-bubble-presence-toggle">
+            Show online/idle/offline counts
           </label>
         </div>
 
@@ -315,6 +337,7 @@ export class TWSESettingsPanel extends HTMLElement {
       apiKey: this._props.apiKey,
       warSorting: this._props.warSorting,
       bubbleEnabled: this._props.bubbleEnabled,
+      bubblePresenceEnabled: this._props.bubblePresenceEnabled,
       copyButtonEnabled: this._props.copyButtonEnabled,
       copyFormat: this._props.copyFormat,
       twseServerEnabled: this._props.twseServerEnabled,
@@ -360,6 +383,11 @@ export class TWSESettingsPanel extends HTMLElement {
         },
         onBubbleEnabledDraftChange: (val) => {
           this._drafts.bubbleEnabled = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onBubblePresenceEnabledDraftChange: (val) => {
+          this._drafts.bubblePresenceEnabled = val;
           this._showSavedMessage = false;
           this.render();
         },
@@ -446,6 +474,7 @@ export class TWSESettingsPanel extends HTMLElement {
           apiKey: this._drafts.apiKey,
           warSorting: this._drafts.warSorting,
           bubbleEnabled: this._drafts.bubbleEnabled,
+          bubblePresenceEnabled: this._drafts.bubblePresenceEnabled,
           copyButtonEnabled: this._drafts.copyButtonEnabled,
           copyFormat: this._drafts.copyFormat,
           twseServerEnabled: this._drafts.twseServerEnabled,
@@ -484,6 +513,15 @@ export class TWSESettingsPanel extends HTMLElement {
   set bubbleEnabled(val: boolean) {
     this._props.bubbleEnabled = val;
     this._drafts.bubbleEnabled = val;
+    this.render();
+  }
+
+  get bubblePresenceEnabled() {
+    return this._props.bubblePresenceEnabled;
+  }
+  set bubblePresenceEnabled(val: boolean) {
+    this._props.bubblePresenceEnabled = val;
+    this._drafts.bubblePresenceEnabled = val;
     this.render();
   }
 
@@ -563,6 +601,14 @@ export class TWSESettingsPanel extends HTMLElement {
   }
   set draftBubbleEnabled(val: boolean) {
     this._drafts.bubbleEnabled = val;
+    this.render();
+  }
+
+  get draftBubblePresenceEnabled() {
+    return this._drafts.bubblePresenceEnabled;
+  }
+  set draftBubblePresenceEnabled(val: boolean) {
+    this._drafts.bubblePresenceEnabled = val;
     this.render();
   }
 
