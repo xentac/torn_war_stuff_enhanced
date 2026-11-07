@@ -20,7 +20,7 @@ export type CanonicalStatus =
   | "Unknown";
 
 /**
- * The sort group (CONTEXT.md "Sort model") a member's row belongs to, ahead of
+ * The sort group (GLOSSARY.md "Sort model") a member's row belongs to, ahead of
  * any within-group tie-break. Tier A and Tier B (ADR-0003) are the two sort
  * groups used within the Okay section; the rest order non-Okay states.
  */
@@ -63,11 +63,11 @@ export interface TransitionState {
 }
 
 export interface ClassificationConfig {
-  /** Unexpected-transition highlight window (CONTEXT.md). */
+  /** Unexpected-transition highlight window (GLOSSARY.md). */
   unexpectedHighlightMs: DurationMs;
-  /** Near-expiry highlight threshold (CONTEXT.md). */
+  /** Near-expiry highlight threshold (GLOSSARY.md). */
   nearExpiryThresholdSec: DurationSec;
-  /** Expiry tolerance (CONTEXT.md): exits this close to the scheduled end are expected. */
+  /** Expiry tolerance (GLOSSARY.md): exits this close to the scheduled end are expected. */
   expectedExpiryToleranceSec: DurationSec;
 }
 
