@@ -14,6 +14,7 @@ enum CONFIG_KEYS {
   COPY_FORMAT = "copy_format",
   TWSE_SERVER_ENABLED = "twse_server_enabled",
   REVIVABLE_INDICATOR_ENABLED = "revivable_indicator_enabled",
+  PDA_HTTP_ENABLED = "pda_http_enabled",
 }
 
 export type CopyFormat = "name_id" | "rich";
@@ -205,6 +206,18 @@ export class Config {
   }
 
   /**
+   * Checks whether Torn API requests go through Torn PDA's PDA_httpGet when
+   * it is available, instead of the WebView's fetch.
+   */
+  get pda_http_enabled(): boolean {
+    return this.storage.get<boolean>(CONFIG_KEYS.PDA_HTTP_ENABLED) ?? true;
+  }
+
+  set pda_http_enabled(val: boolean) {
+    this.storage.set(CONFIG_KEYS.PDA_HTTP_ENABLED, val);
+  }
+
+  /**
    * Resets all configurations except API key.
    */
   public reset(): void {
@@ -219,6 +232,7 @@ export class Config {
     this.storage.remove(CONFIG_KEYS.COPY_FORMAT);
     this.storage.remove(CONFIG_KEYS.TWSE_SERVER_ENABLED);
     this.storage.remove(CONFIG_KEYS.REVIVABLE_INDICATOR_ENABLED);
+    this.storage.remove(CONFIG_KEYS.PDA_HTTP_ENABLED);
   }
 }
 

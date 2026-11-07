@@ -4,6 +4,12 @@ import type { FactionId, FactionResponse } from "./types";
 
 const log = logger.child("api");
 
+/** Torn PDA's PDA_httpGet, injected into the page by the app. */
+type PdaHttpGet = (
+  url: string,
+  headers: Record<string, string>,
+) => Promise<{ status: number; responseText: string }>;
+
 export class TornApiClient {
   private baseUrl = "https://api.torn.com/v2/faction";
 
@@ -28,6 +34,11 @@ export class TornApiClient {
     const url = `${this.baseUrl}?id=${factionId}&selections=members,wars,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced&timestamp=${(Date.now() % 1000) + 10}`;
 
     try {
+      const pdaHttpGet = (window as any).PDA_httpGet as PdaHttpGet | undefined;
+      if (twseconfig.pda_http_enabled && typeof pdaHttpGet === "function") {
+        return await this.fetchViaPda(pdaHttpGet, url);
+      }
+
       const response = await fetch(url);
       if (!response.ok) {
         try {
@@ -53,6 +64,33 @@ export class TornApiClient {
       );
       return null;
     }
+  }
+
+  /**
+   * Fetches through Torn PDA's native HTTP client instead of the WebView's
+   * fetch, which can return an empty body on some devices.
+   */
+  private async fetchViaPda(
+    pdaHttpGet: PdaHttpGet,
+    url: string,
+  ): Promise<FactionResponse> {
+    const response = await pdaHttpGet(url, {});
+    if (response.status < 200 || response.status >= 300) {
+      try {
+        const errData = JSON.parse(response.responseText) as {
+          code: number;
+          error: string;
+        };
+        log.error(
+          `Torn API returned error code ${errData.code}: ${errData.error}`,
+        );
+        return { error: errData };
+      } catch {
+        throw new Error(`HTTP Error status: ${response.status}`);
+      }
+    }
+
+    return JSON.parse(response.responseText) as FactionResponse;
   }
 
   /**

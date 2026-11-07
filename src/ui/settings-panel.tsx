@@ -11,6 +11,7 @@ const DEFAULT_VALUES = {
   copyFormat: "name_id" as CopyFormat,
   twseServerEnabled: true,
   revivableIndicatorEnabled: true,
+  pdaHttpEnabled: true,
   debugLogs: false,
   debugForceReactFallback: false,
 };
@@ -28,6 +29,7 @@ type SettingsPanelComponentProps = {
   onCopyFormatDraftChange: (val: CopyFormat) => void;
   onTwseServerEnabledDraftChange: (val: boolean) => void;
   onRevivableIndicatorEnabledDraftChange: (val: boolean) => void;
+  onPdaHttpEnabledDraftChange: (val: boolean) => void;
   onDebugLogsDraftChange: (val: boolean) => void;
   onDebugForceReactFallbackDraftChange: (val: boolean) => void;
   onSave: () => void;
@@ -49,6 +51,7 @@ export function SettingsPanelComponent({
   onCopyFormatDraftChange,
   onTwseServerEnabledDraftChange,
   onRevivableIndicatorEnabledDraftChange,
+  onPdaHttpEnabledDraftChange,
   onDebugLogsDraftChange,
   onDebugForceReactFallbackDraftChange,
   onSave,
@@ -227,6 +230,28 @@ export function SettingsPanelComponent({
           </div>
         </div>
 
+        {/* Torn PDA HTTP toggle */}
+        <div className="input-row-inline">
+          <input
+            id="twse-pda-http-enabled"
+            type="checkbox"
+            checked={drafts.pdaHttpEnabled}
+            onChange={(e) =>
+              onPdaHttpEnabledDraftChange(
+                (e.target as HTMLInputElement).checked,
+              )
+            }
+          />
+          <label htmlFor="twse-pda-http-enabled">
+            Use Torn PDA's HTTP functions when available
+          </label>
+          <div className="twse-api-explanation">
+            <strong>Info:</strong> When enabled and running in Torn PDA, Torn
+            API requests go through PDA's own HTTP client instead of the
+            browser's fetch. Has no effect outside Torn PDA.
+          </div>
+        </div>
+
         {/* Debug logs toggle */}
         <div className="input-row-inline">
           <input
@@ -342,6 +367,7 @@ export class TWSESettingsPanel extends HTMLElement {
       copyFormat: this._props.copyFormat,
       twseServerEnabled: this._props.twseServerEnabled,
       revivableIndicatorEnabled: this._props.revivableIndicatorEnabled,
+      pdaHttpEnabled: this._props.pdaHttpEnabled,
       debugLogs: this._props.debugLogs,
       debugForceReactFallback: this._props.debugForceReactFallback,
     };
@@ -408,6 +434,11 @@ export class TWSESettingsPanel extends HTMLElement {
         },
         onRevivableIndicatorEnabledDraftChange: (val) => {
           this._drafts.revivableIndicatorEnabled = val;
+          this._showSavedMessage = false;
+          this.render();
+        },
+        onPdaHttpEnabledDraftChange: (val) => {
+          this._drafts.pdaHttpEnabled = val;
           this._showSavedMessage = false;
           this.render();
         },
@@ -479,6 +510,7 @@ export class TWSESettingsPanel extends HTMLElement {
           copyFormat: this._drafts.copyFormat,
           twseServerEnabled: this._drafts.twseServerEnabled,
           revivableIndicatorEnabled: this._drafts.revivableIndicatorEnabled,
+          pdaHttpEnabled: this._drafts.pdaHttpEnabled,
           debugLogs: this._drafts.debugLogs,
           debugForceReactFallback: this._drafts.debugForceReactFallback,
         },
@@ -558,6 +590,15 @@ export class TWSESettingsPanel extends HTMLElement {
   set revivableIndicatorEnabled(val: boolean) {
     this._props.revivableIndicatorEnabled = val;
     this._drafts.revivableIndicatorEnabled = val;
+    this.render();
+  }
+
+  get pdaHttpEnabled() {
+    return this._props.pdaHttpEnabled;
+  }
+  set pdaHttpEnabled(val: boolean) {
+    this._props.pdaHttpEnabled = val;
+    this._drafts.pdaHttpEnabled = val;
     this.render();
   }
 
@@ -641,6 +682,14 @@ export class TWSESettingsPanel extends HTMLElement {
   }
   set draftRevivableIndicatorEnabled(val: boolean) {
     this._drafts.revivableIndicatorEnabled = val;
+    this.render();
+  }
+
+  get draftPdaHttpEnabled() {
+    return this._drafts.pdaHttpEnabled;
+  }
+  set draftPdaHttpEnabled(val: boolean) {
+    this._drafts.pdaHttpEnabled = val;
     this.render();
   }
 

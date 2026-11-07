@@ -36,6 +36,7 @@ const SettingsFeature: Feature = {
     panel.copyFormat = twseconfig.copy_format;
     panel.twseServerEnabled = twseconfig.twse_server_enabled;
     panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+    panel.pdaHttpEnabled = twseconfig.pda_http_enabled;
     panel.debugLogs = twseconfig.debug_logs;
     panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 
@@ -50,6 +51,7 @@ const SettingsFeature: Feature = {
       twseconfig.copy_format = detail.copyFormat;
       twseconfig.twse_server_enabled = detail.twseServerEnabled;
       twseconfig.revivable_indicator_enabled = detail.revivableIndicatorEnabled;
+      twseconfig.pda_http_enabled = detail.pdaHttpEnabled;
       twseconfig.debug_logs = detail.debugLogs;
       twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
 
@@ -72,6 +74,7 @@ const SettingsFeature: Feature = {
       panel.copyFormat = twseconfig.copy_format;
       panel.twseServerEnabled = twseconfig.twse_server_enabled;
       panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+      panel.pdaHttpEnabled = twseconfig.pda_http_enabled;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
 
