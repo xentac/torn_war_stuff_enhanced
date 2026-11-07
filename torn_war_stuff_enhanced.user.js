@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn War Stuff Enhanced
 // @namespace    namespace
-// @version      2.2
+// @version      2.3
 // @author       xentac
 // @description  Show travel status and hospital time and sort by hospital time on war page.
 // @license      MIT
@@ -300,6 +300,14 @@ get bubble_enabled() {
     set bubble_enabled(val) {
       this.storage.set("bubble_enabled", val);
     }
+get bubble_presence_enabled() {
+      return this.storage.get(
+        "bubble_presence_enabled"
+) ?? true;
+    }
+    set bubble_presence_enabled(val) {
+      this.storage.set("bubble_presence_enabled", val);
+    }
 get copy_button_enabled() {
       return this.storage.get(
         "copy_button_enabled"
@@ -332,6 +340,14 @@ get revivable_indicator_enabled() {
     set revivable_indicator_enabled(val) {
       this.storage.set("revivable_indicator_enabled", val);
     }
+get pda_http_enabled() {
+      return this.storage.get(
+        "pda_http_enabled"
+) ?? true;
+    }
+    set pda_http_enabled(val) {
+      this.storage.set("pda_http_enabled", val);
+    }
 reset() {
       this.storage.remove(
         "debug_logs"
@@ -352,6 +368,9 @@ reset() {
         "bubble_enabled"
 );
       this.storage.remove(
+        "bubble_presence_enabled"
+);
+      this.storage.remove(
         "copy_button_enabled"
 );
       this.storage.remove(
@@ -362,6 +381,9 @@ reset() {
 );
       this.storage.remove(
         "revivable_indicator_enabled"
+);
+      this.storage.remove(
+        "pda_http_enabled"
 );
     }
   }
@@ -560,10 +582,12 @@ reset() {
     apiKey: "",
     warSorting: true,
     bubbleEnabled: true,
+    bubblePresenceEnabled: true,
     copyButtonEnabled: true,
     copyFormat: "name_id",
     twseServerEnabled: true,
     revivableIndicatorEnabled: true,
+    pdaHttpEnabled: true,
     debugLogs: false,
     debugForceReactFallback: false
   };
@@ -575,10 +599,12 @@ reset() {
     onApiKeyCommit,
     onWarSortingDraftChange,
     onBubbleEnabledDraftChange,
+    onBubblePresenceEnabledDraftChange,
     onCopyButtonEnabledDraftChange,
     onCopyFormatDraftChange,
     onTwseServerEnabledDraftChange,
     onRevivableIndicatorEnabledDraftChange,
+    onPdaHttpEnabledDraftChange,
     onDebugLogsDraftChange,
     onDebugForceReactFallbackDraftChange,
     onSave,
@@ -643,6 +669,21 @@ jsx(
           ),
 jsx("label", { htmlFor: "twse-chain-bubble-toggle", children: "Show Floating Chain Bubble (displays real-time countdown of your faction's chain)" })
         ] }),
+jsxs("div", { className: "input-row-inline twse-sub-setting", children: [
+jsx(
+            "input",
+            {
+              id: "twse-chain-bubble-presence-toggle",
+              type: "checkbox",
+              checked: drafts.bubblePresenceEnabled,
+              disabled: !drafts.bubbleEnabled,
+              onChange: (e) => onBubblePresenceEnabledDraftChange(
+                e.target.checked
+              )
+            }
+          ),
+jsx("label", { htmlFor: "twse-chain-bubble-presence-toggle", children: "Show online/idle/offline counts" })
+        ] }),
 jsxs("div", { className: "input-row-inline", children: [
 jsx(
             "input",
@@ -705,6 +746,24 @@ jsx("label", { htmlFor: "twse-server-enabled", children: "Share and receive fact
 jsxs("div", { className: "twse-api-explanation", children: [
 jsx("strong", { children: "Info:" }),
             " When enabled, this script shares your faction's status data (member statuses, hospital timers, chain state) with the TWSE Server, tagged with a hashed (not reversible) copy of your API key — and in turn receives fresher updates contributed by other users' scripts in the gaps between your own 10-second polls. Disabling this stops both: nothing is sent, and no community updates are received."
+          ] })
+        ] }),
+jsxs("div", { className: "input-row-inline", children: [
+jsx(
+            "input",
+            {
+              id: "twse-pda-http-enabled",
+              type: "checkbox",
+              checked: drafts.pdaHttpEnabled,
+              onChange: (e) => onPdaHttpEnabledDraftChange(
+                e.target.checked
+              )
+            }
+          ),
+jsx("label", { htmlFor: "twse-pda-http-enabled", children: "Use Torn PDA's HTTP functions when available" }),
+jsxs("div", { className: "twse-api-explanation", children: [
+jsx("strong", { children: "Info:" }),
+            " When enabled and running in Torn PDA, Torn API requests go through PDA's own HTTP client instead of the browser's fetch. Has no effect outside Torn PDA."
           ] })
         ] }),
 jsxs("div", { className: "input-row-inline", children: [
@@ -808,10 +867,12 @@ jsx(
         apiKey: this._props.apiKey,
         warSorting: this._props.warSorting,
         bubbleEnabled: this._props.bubbleEnabled,
+        bubblePresenceEnabled: this._props.bubblePresenceEnabled,
         copyButtonEnabled: this._props.copyButtonEnabled,
         copyFormat: this._props.copyFormat,
         twseServerEnabled: this._props.twseServerEnabled,
         revivableIndicatorEnabled: this._props.revivableIndicatorEnabled,
+        pdaHttpEnabled: this._props.pdaHttpEnabled,
         debugLogs: this._props.debugLogs,
         debugForceReactFallback: this._props.debugForceReactFallback
       };
@@ -853,6 +914,11 @@ jsx(
             this._showSavedMessage = false;
             this.render();
           },
+          onBubblePresenceEnabledDraftChange: (val) => {
+            this._drafts.bubblePresenceEnabled = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
           onCopyButtonEnabledDraftChange: (val) => {
             this._drafts.copyButtonEnabled = val;
             this._showSavedMessage = false;
@@ -870,6 +936,11 @@ jsx(
           },
           onRevivableIndicatorEnabledDraftChange: (val) => {
             this._drafts.revivableIndicatorEnabled = val;
+            this._showSavedMessage = false;
+            this.render();
+          },
+          onPdaHttpEnabledDraftChange: (val) => {
+            this._drafts.pdaHttpEnabled = val;
             this._showSavedMessage = false;
             this.render();
           },
@@ -930,10 +1001,12 @@ jsx(
             apiKey: this._drafts.apiKey,
             warSorting: this._drafts.warSorting,
             bubbleEnabled: this._drafts.bubbleEnabled,
+            bubblePresenceEnabled: this._drafts.bubblePresenceEnabled,
             copyButtonEnabled: this._drafts.copyButtonEnabled,
             copyFormat: this._drafts.copyFormat,
             twseServerEnabled: this._drafts.twseServerEnabled,
             revivableIndicatorEnabled: this._drafts.revivableIndicatorEnabled,
+            pdaHttpEnabled: this._drafts.pdaHttpEnabled,
             debugLogs: this._drafts.debugLogs,
             debugForceReactFallback: this._drafts.debugForceReactFallback
           },
@@ -966,6 +1039,14 @@ get apiKey() {
       this._drafts.bubbleEnabled = val;
       this.render();
     }
+    get bubblePresenceEnabled() {
+      return this._props.bubblePresenceEnabled;
+    }
+    set bubblePresenceEnabled(val) {
+      this._props.bubblePresenceEnabled = val;
+      this._drafts.bubblePresenceEnabled = val;
+      this.render();
+    }
     get copyButtonEnabled() {
       return this._props.copyButtonEnabled;
     }
@@ -996,6 +1077,14 @@ get apiKey() {
     set revivableIndicatorEnabled(val) {
       this._props.revivableIndicatorEnabled = val;
       this._drafts.revivableIndicatorEnabled = val;
+      this.render();
+    }
+    get pdaHttpEnabled() {
+      return this._props.pdaHttpEnabled;
+    }
+    set pdaHttpEnabled(val) {
+      this._props.pdaHttpEnabled = val;
+      this._drafts.pdaHttpEnabled = val;
       this.render();
     }
     get debugLogs() {
@@ -1035,6 +1124,13 @@ get draftApiKey() {
       this._drafts.bubbleEnabled = val;
       this.render();
     }
+    get draftBubblePresenceEnabled() {
+      return this._drafts.bubblePresenceEnabled;
+    }
+    set draftBubblePresenceEnabled(val) {
+      this._drafts.bubblePresenceEnabled = val;
+      this.render();
+    }
     get draftCopyButtonEnabled() {
       return this._drafts.copyButtonEnabled;
     }
@@ -1061,6 +1157,13 @@ get draftApiKey() {
     }
     set draftRevivableIndicatorEnabled(val) {
       this._drafts.revivableIndicatorEnabled = val;
+      this.render();
+    }
+    get draftPdaHttpEnabled() {
+      return this._drafts.pdaHttpEnabled;
+    }
+    set draftPdaHttpEnabled(val) {
+      this._drafts.pdaHttpEnabled = val;
       this.render();
     }
     get draftDebugLogs() {
@@ -1099,10 +1202,12 @@ get draftApiKey() {
       panel.apiKey = twseconfig.apiKey;
       panel.warSorting = twseconfig.war_sorting;
       panel.bubbleEnabled = twseconfig.bubble_enabled;
+      panel.bubblePresenceEnabled = twseconfig.bubble_presence_enabled;
       panel.copyButtonEnabled = twseconfig.copy_button_enabled;
       panel.copyFormat = twseconfig.copy_format;
       panel.twseServerEnabled = twseconfig.twse_server_enabled;
       panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+      panel.pdaHttpEnabled = twseconfig.pda_http_enabled;
       panel.debugLogs = twseconfig.debug_logs;
       panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
       panel.addEventListener("twse-save", (e) => {
@@ -1110,10 +1215,12 @@ get draftApiKey() {
         twseconfig.apiKey = detail.apiKey;
         twseconfig.war_sorting = detail.warSorting;
         twseconfig.bubble_enabled = detail.bubbleEnabled;
+        twseconfig.bubble_presence_enabled = detail.bubblePresenceEnabled;
         twseconfig.copy_button_enabled = detail.copyButtonEnabled;
         twseconfig.copy_format = detail.copyFormat;
         twseconfig.twse_server_enabled = detail.twseServerEnabled;
         twseconfig.revivable_indicator_enabled = detail.revivableIndicatorEnabled;
+        twseconfig.pda_http_enabled = detail.pdaHttpEnabled;
         twseconfig.debug_logs = detail.debugLogs;
         twseconfig.debug_force_react_fallback = detail.debugForceReactFallback;
         log$5.info("Settings saved successfully");
@@ -1124,10 +1231,12 @@ get draftApiKey() {
         panel.apiKey = twseconfig.apiKey;
         panel.warSorting = twseconfig.war_sorting;
         panel.bubbleEnabled = twseconfig.bubble_enabled;
+        panel.bubblePresenceEnabled = twseconfig.bubble_presence_enabled;
         panel.copyButtonEnabled = twseconfig.copy_button_enabled;
         panel.copyFormat = twseconfig.copy_format;
         panel.twseServerEnabled = twseconfig.twse_server_enabled;
         panel.revivableIndicatorEnabled = twseconfig.revivable_indicator_enabled;
+        panel.pdaHttpEnabled = twseconfig.pda_http_enabled;
         panel.debugLogs = twseconfig.debug_logs;
         panel.debugForceReactFallback = twseconfig.debug_force_react_fallback;
         log$5.info("Settings reset to defaults");
@@ -1185,6 +1294,10 @@ async fetchFactionData(factionId) {
       }
       const url = `${this.baseUrl}?id=${factionId}&selections=members,wars,chain,timestamp&key=${key}&comment=TornWarStuffEnhanced&timestamp=${Date.now() % 1e3 + 10}`;
       try {
+        const pdaHttpGet = window.PDA_httpGet;
+        if (twseconfig.pda_http_enabled && typeof pdaHttpGet === "function") {
+          return await this.fetchViaPda(pdaHttpGet, url);
+        }
         const response = await fetch(url);
         if (!response.ok) {
           try {
@@ -1206,6 +1319,21 @@ async fetchFactionData(factionId) {
         );
         return null;
       }
+    }
+async fetchViaPda(pdaHttpGet, url) {
+      const response = await pdaHttpGet(url, {});
+      if (response.status < 200 || response.status >= 300) {
+        try {
+          const errData = JSON.parse(response.responseText);
+          log$4.error(
+            `Torn API returned error code ${errData.code}: ${errData.error}`
+          );
+          return { error: errData };
+        } catch {
+          throw new Error(`HTTP Error status: ${response.status}`);
+        }
+      }
+      return JSON.parse(response.responseText);
     }
 isUnrecoverableError(errorCode) {
       const unrecoverable = [0, 1, 2, 3, 4, 6, 7, 10, 12, 13, 14, 16, 18, 21];
@@ -1548,7 +1676,7 @@ submit(factionId, payload) {
     }
   }
   const twseClient = new TwseServerClient();
-  const stylesCss = '.members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone],body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]{position:relative!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before,body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{content:"+";position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:800;line-height:1}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before{color:#ef4444!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{color:#a06bf0!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}.twse-chain-presence{font-family:monospace;color:#bbb}.twse-presence-online{color:#a3d900}.twse-presence-idle{color:#ffbf00}.twse-presence-offline{color:#ccc}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}';
+  const stylesCss = '.members-list li:has(div.status[data-twse-highlight=true]){background-color:#99eb99!important}:root.twse-window-focused .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#c4974c!important}.members-list div.status[data-twse-traveling=true]:after{color:#696026!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone],body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]{position:relative!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before,body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{content:"+";position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:800;line-height:1}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=everyone]:before{color:#ef4444!important}body:not(.twse-revivable-disabled) .members-list div.status[data-twse-revivable=friends-faction]:before{color:#a06bf0!important}:root .dark-mode .members-list li:has(div.status[data-twse-highlight=true]){background-color:#446944!important}:root.twse-window-focused .dark-mode .members-list li:has(div.status[data-twse-status-differs=true]){background-color:#795315!important}:root .dark-mode .members-list div.status[data-twse-traveling=true]:after{color:#ffed76!important}.members-list div.status[data-twse-overridden=true]{position:relative!important;color:transparent!important}.members-list div.status[data-twse-overridden=true]:after{content:var(--twse-content);position:absolute;top:0;left:0;width:calc(100% - 10px);height:100%;background:inherit;display:flex;right:10px;justify-content:flex-end;align-items:center;white-space:nowrap!important}.members-list .ok.status:after{color:var(--user-status-green-color)}.members-list .not-ok.status:after{color:var(--user-status-red-color)}.members-list .abroad.status:after,.members-list .traveling.status:after{color:var(--user-status-blue-color)}.twse-sort-toggle-container{position:absolute;left:10px;display:inline-flex;align-items:center}.twse-sort-toggle-label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#999;font-size:13px;-webkit-user-select:none;user-select:none}.twse-sort-toggle-checkbox{cursor:pointer;margin:0;width:13px;height:13px}.members-list li .member{position:relative!important;display:flex!important;align-items:center}.twse-copy-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#888;transition:color .15s,background-color .15s,transform .1s;border-radius:4px;z-index:10}.twse-copy-btn:hover{color:#333;background-color:#0000000d}:root .dark-mode .twse-copy-btn:hover{color:#fff;background-color:#ffffff26}.twse-copy-btn:active{transform:translateY(-50%) scale(.9)}.twse-copy-btn.success{color:#494!important}:root .dark-mode .twse-copy-btn.success{color:#69eb69!important}.twse-chain-bubble{position:fixed;bottom:100px;right:20px;z-index:999999;background:#1e1e1ed9;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;box-shadow:0 8px 32px #0000005e;color:#e0e0e0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:11px;line-height:1.5;display:flex;flex-direction:column;transition:opacity .3s ease,transform .3s ease;min-width:100px;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none!important}.twse-chain-bubble *{touch-action:none!important}.twse-chain-bubble.hidden{opacity:0;transform:translateY(10px);pointer-events:none}.twse-chain-body{display:flex;flex-direction:column;gap:4px;width:100%}.twse-chain-tag,.twse-chain-mult{display:none}.twse-chain-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.twse-chain-stats{display:flex;align-items:center;gap:6px;width:100%}.twse-chain-count{font-weight:600;color:#fff}.twse-chain-timer{margin-left:auto;font-family:monospace;font-weight:700;padding:2px 6px;border-radius:4px;background:#0000004d}.twse-chain-timer.okay{color:#69eb69}.twse-chain-timer.cooldown{color:#64b5f6;background:#64b5f626}.twse-chain-count.cooldown{color:#64b5f6}.twse-chain-timer.negative{color:#ff5252}.twse-chain-timer.urgent{color:#ff5252;background:#ff525226;animation:twse-pulse 1s infinite alternate}.twse-chain-presence{font-family:monospace;color:#bbb}.twse-presence-online{color:#a3d900}.twse-presence-idle{color:#ffbf00}.twse-presence-offline{color:#ccc}@keyframes twse-pulse{0%{box-shadow:0 0 2px #ff525266}to{box-shadow:0 0 8px #ff5252cc}}body.twse-copy-disabled .twse-copy-btn,body.twse-bubble-disabled #twse-chain-bubble,body.twse-presence-disabled #twse-chain-bubble .twse-chain-presence{display:none!important}body{--twse-bg-color: #f0f0f0;--twse-alt-bg-color: #fff;--twse-border-color: #ccc;--twse-input-color: #333;--twse-text-color: #000;--twse-hover-color: #ddd;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}:root .dark-mode{--twse-bg-color: #333;--twse-alt-bg-color: #383838;--twse-border-color: #444;--twse-input-color: #ccc;--twse-text-color: #ccc;--twse-hover-color: #555;--twse-glow-color: #4caf50;--twse-success-color: #4caf50}twse-settings-panel{display:block;margin-top:20px;clear:both}twse-settings-panel .accordion{margin:10px 0;padding:15px;background-color:var(--twse-bg-color);border:1px solid var(--twse-border-color);border-radius:5px;color:var(--twse-text-color);font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}twse-settings-panel .accordion.glow{border-color:var(--twse-glow-color);box-shadow:0 0 8px #4caf5080}twse-settings-panel .input-row{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}twse-settings-panel .input-row-inline{display:flex;align-items:center;gap:10px;margin-bottom:15px;font-size:13px;cursor:pointer;-webkit-user-select:none;user-select:none}twse-settings-panel .input-row-inline input[type=checkbox]{cursor:pointer;width:14px;height:14px;margin:0}twse-settings-panel .input-row-inline label{cursor:pointer;line-height:1.4}twse-settings-panel .input-row-inline.twse-sub-setting{margin-left:24px}twse-settings-panel .input-row-inline input[type=checkbox]:disabled,twse-settings-panel .input-row-inline input[type=checkbox]:disabled+label{cursor:not-allowed;opacity:.5}twse-settings-panel .blur-mode{filter:blur(4px);transition:filter .2s ease}twse-settings-panel .blur-mode:hover,twse-settings-panel .blur-mode:focus{filter:blur(0)}twse-settings-panel input[type=text]{box-sizing:border-box;text-align:left;vertical-align:top;width:250px;height:34px;margin-right:8px;padding:8px 10px;line-height:14px;display:inline-block;border:1px solid var(--twse-border-color);border-radius:5px;background-color:var(--twse-alt-bg-color);color:var(--twse-text-color);outline:none}twse-settings-panel input[type=text]:focus{border-color:var(--twse-glow-color)}twse-settings-panel .twse-api-explanation{background-color:var(--twse-alt-bg-color);border:1px solid var(--twse-border-color);border-radius:8px;color:var(--twse-text-color);margin-top:5px;margin-bottom:5px;padding:10px 14px;font-size:12px;line-height:1.4;max-width:600px}twse-settings-panel h3{margin:20px 0 12px;font-size:14px;font-weight:700;border-bottom:1px solid var(--twse-border-color);padding-bottom:6px}';
   importCSS(stylesCss);
   var SortGroup = ((SortGroup2) => {
     SortGroup2["UnexpectedOkay"] = "UnexpectedOkay";
@@ -1850,6 +1978,10 @@ submit(factionId, payload) {
           document.body.classList.toggle(
             "twse-bubble-disabled",
             !twseconfig.bubble_enabled
+          );
+          document.body.classList.toggle(
+            "twse-presence-disabled",
+            !twseconfig.bubble_presence_enabled
           );
           document.body.classList.toggle(
             "twse-revivable-disabled",
